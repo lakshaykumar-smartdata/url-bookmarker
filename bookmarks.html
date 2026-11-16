@@ -1,0 +1,420 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bookmarks</title>
+  <link rel="icon" href="icons/icon32.png">
+  <style>
+    :root {
+      --bg: #f7f7f8; --surface: #fff; --border: #e6e6ea; --line: #f0f0f3;
+      --text: #18181b; --muted: #6b6b76; --faint: #a1a1aa;
+      --accent: #2563eb; --accent-soft: #eef3fe; --accent-ring: #c7d7fd;
+      --danger: #dc2626; --danger-soft: #fef2f2;
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    html, body { height: 100%; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font: 14px/1.45 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+      display: grid; grid-template-rows: auto 1fr;
+      -webkit-font-smoothing: antialiased;
+    }
+    button { font: inherit; color: inherit; cursor: pointer; }
+    .i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+    /* ---------- Top bar ---------- */
+    header {
+      display: flex; align-items: center; gap: 20px;
+      height: 64px; padding: 0 20px; background: var(--surface); border-bottom: 1px solid var(--border);
+    }
+    .brand { display: flex; align-items: center; gap: 10px; width: 228px; flex: none; font-weight: 650; font-size: 16px; }
+    .brand img { width: 28px; height: 28px; }
+    .search { flex: 1; max-width: 620px; position: relative; display: flex; align-items: center; }
+    .search .i { position: absolute; left: 12px; color: var(--faint); pointer-events: none; }
+    .search input {
+      width: 100%; height: 40px; padding: 0 44px 0 38px; font: inherit; color: var(--text);
+      border: 1px solid var(--border); border-radius: 10px; background: var(--bg); outline: none;
+      transition: border-color .15s, box-shadow .15s, background .15s;
+    }
+    .search input::placeholder { color: var(--faint); }
+    .search input:hover { border-color: #d4d4da; }
+    .search input:focus { background: var(--surface); border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+    .search kbd {
+      position: absolute; right: 10px; font: 11px/18px inherit; color: var(--muted);
+      min-width: 20px; text-align: center; border: 1px solid var(--border); border-bottom-width: 2px;
+      border-radius: 5px; background: var(--surface);
+    }
+    .search input:not(:placeholder-shown) ~ kbd { display: none; }
+    .actions { margin-left: auto; display: flex; gap: 8px; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 13px;
+      font-size: 13px; font-weight: 500; white-space: nowrap;
+      border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--text);
+      transition: background .15s, border-color .15s;
+    }
+    .btn:hover { background: var(--bg); border-color: #d4d4da; }
+    .btn .i { color: var(--muted); }
+
+    /* ---------- Sidebar ---------- */
+    .layout { display: grid; grid-template-columns: 268px 1fr; min-height: 0; }
+    nav { overflow-y: auto; padding: 14px 12px 24px; background: var(--surface); border-right: 1px solid var(--border); }
+    nav .label {
+      font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+      color: var(--faint); padding: 16px 10px 6px;
+    }
+    nav button {
+      position: relative; display: flex; align-items: center; gap: 10px; width: 100%; height: 36px;
+      padding: 0 10px; margin-bottom: 1px; border: 0; border-radius: 8px; background: none; text-align: left;
+      color: #3f3f46; transition: background .12s;
+    }
+    nav button .i { color: var(--faint); }
+    nav button:hover { background: #f4f4f6; }
+    nav button.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+    nav button.active .i { color: var(--accent); }
+    nav .name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    nav .count { font-size: 12px; color: var(--faint); font-variant-numeric: tabular-nums; }
+    nav button.active .count { color: var(--accent); }
+
+    /* ---------- Main list ---------- */
+    main { overflow-y: auto; padding: 28px 32px 48px; }
+    .wrap { max-width: 980px; margin: 0 auto; }
+    .heading { display: flex; align-items: center; gap: 10px; margin: 0 0 16px; }
+    .heading h2 { margin: 0; font-size: 22px; font-weight: 650; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .heading { min-height: 38px; }
+    .rename-input {
+      flex: 0 1 420px; min-width: 0; height: 38px; padding: 0 10px; margin-left: -11px;
+      font: inherit; font-size: 20px; font-weight: 650; color: var(--text);
+      border: 1px solid var(--accent); border-radius: 9px; outline: none; box-shadow: 0 0 0 3px var(--accent-ring);
+    }
+    .folder-actions { margin-left: auto; display: flex; gap: 6px; }
+    .btn.small { height: 32px; padding: 0 11px; font-size: 12.5px; }
+    .btn.danger:hover { color: var(--danger); border-color: #fecaca; background: var(--danger-soft); }
+    .btn.danger:hover .i { color: var(--danger); }
+    .pill {
+      font-size: 12px; font-weight: 600; color: var(--muted); background: #ececf0;
+      padding: 2px 9px; border-radius: 999px; font-variant-numeric: tabular-nums; white-space: nowrap;
+    }
+
+    ul {
+      list-style: none; margin: 0; padding: 4px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: var(--radius);
+      box-shadow: 0 1px 2px rgb(16 16 24 / 4%);
+    }
+    li {
+      position: relative; display: flex; align-items: center; gap: 14px;
+      padding: 10px 12px; border-radius: 9px; transition: background .12s;
+    }
+    li + li { box-shadow: 0 -1px 0 var(--line); }
+    li:hover { background: #f8f8fa; box-shadow: none; }
+    li:hover + li { box-shadow: none; }
+    .fav {
+      width: 34px; height: 34px; flex: none; display: grid; place-items: center;
+      border: 1px solid var(--line); border-radius: 9px; background: var(--surface); overflow: hidden;
+    }
+    .favimg { width: 18px; height: 18px; object-fit: contain; }
+    .favimg.letter { width: 100%; height: 100%; display: grid; place-items: center; font-size: 13px; font-weight: 700; }
+    .info { flex: 1; min-width: 0; }
+    .info a {
+      display: block; color: var(--text); text-decoration: none; font-weight: 550; font-size: 14px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; outline: none;
+    }
+    .info a::after { content: ""; position: absolute; inset: 0; border-radius: 9px; } /* whole row opens the link */
+    .info a:focus-visible::after { box-shadow: 0 0 0 2px var(--accent); }
+    li:hover .info a { color: var(--accent); }
+    .meta { color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .chip {
+      position: relative; z-index: 1; flex: none; display: inline-flex; align-items: center; gap: 5px;
+      max-width: 200px; height: 26px; padding: 0 9px; font-size: 12px; color: var(--muted);
+      border: 1px solid var(--border); border-radius: 7px; background: var(--surface);
+    }
+    .chip .i { width: 13px; height: 13px; }
+    .chip span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .chip:hover { color: var(--accent); border-color: var(--accent-ring); background: var(--accent-soft); }
+
+    .row-actions { position: relative; z-index: 1; display: flex; gap: 2px; opacity: 0; transition: opacity .12s; }
+    li:hover .row-actions, .row-actions:focus-within { opacity: 1; }
+    .icon-btn {
+      width: 32px; height: 32px; display: grid; place-items: center;
+      border: 0; border-radius: 8px; background: none; color: var(--muted);
+    }
+    .icon-btn:hover { background: #ececf0; color: var(--text); }
+    .icon-btn.danger:hover { background: var(--danger-soft); color: var(--danger); }
+    .icon-btn.done { color: #16a34a; }
+
+    .empty { text-align: center; padding: 72px 20px; color: var(--muted); }
+    .empty .circle {
+      width: 56px; height: 56px; margin: 0 auto 14px; display: grid; place-items: center;
+      border-radius: 50%; background: #ececf0; color: var(--muted);
+    }
+    .empty .circle .i { width: 24px; height: 24px; }
+    .empty strong { display: block; color: var(--text); font-size: 15px; margin-bottom: 4px; }
+
+    #toast {
+      position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 12px); opacity: 0;
+      padding: 10px 16px; border-radius: 10px; background: #18181b; color: #fff; font-size: 13px;
+      box-shadow: 0 8px 24px rgb(0 0 0 / 18%); transition: opacity .2s, transform .2s; pointer-events: none;
+      display: flex; align-items: center; gap: 14px; max-width: calc(100vw - 32px);
+    }
+    #toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+    #toast button {
+      border: 0; background: none; color: #93b4ff; font-weight: 600; font-size: 13px; padding: 2px 4px; border-radius: 5px;
+    }
+    #toast button:hover { background: rgb(255 255 255 / 10%); }
+
+    /* ---------- Home tab ---------- */
+    .home { position: relative; height: 100%; min-height: 420px; overflow: hidden; color: #fff; }
+    .page-bg { position: fixed; inset: 0; z-index: 0; background: #11151c; pointer-events: none; }
+    header, .layout { position: relative; z-index: 1; }
+    .bg {
+      position: absolute; inset: 0; background: center / cover no-repeat;
+      opacity: 0; transition: opacity 1.2s ease; transform: scale(1.02);
+    }
+    .bg.on { opacity: 1; }
+    .shade {
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 50% 50% at 58% 50%, rgb(0 0 0 / 25%), transparent 75%),
+        linear-gradient(180deg, rgb(0 0 0 / 50%) 0%, rgb(0 0 0 / 35%) 40%, rgb(0 0 0 / 60%) 100%);
+    }
+
+    /* ---------- Dark glass theme over the photo, on every view ---------- */
+    body.photo {
+      --bg: transparent; --surface: rgb(16 20 28 / 48%);
+      --border: rgb(255 255 255 / 12%); --line: rgb(255 255 255 / 7%);
+      --text: #f4f4f5; --muted: rgb(255 255 255 / 62%); --faint: rgb(255 255 255 / 45%);
+      --accent: #8fb0ff; --accent-soft: rgb(143 176 255 / 16%); --accent-ring: rgb(143 176 255 / 35%);
+      --danger: #fca5a5; --danger-soft: rgb(248 113 113 / 16%);
+      background: #11151c; color: var(--text); color-scheme: dark;
+    }
+    /* Bookmark lists sit on a slightly darker photo than Home. */
+    body.photo:not(.home-mode) .shade { background-color: rgb(0 0 0 / 18%); }
+    body.home-mode main { padding: 0; overflow: hidden; }
+
+    body.photo header, body.photo nav {
+      background: rgb(12 15 22 / 42%); border-color: rgb(255 255 255 / 10%);
+      backdrop-filter: blur(18px) saturate(140%);
+    }
+    body.photo .search input { background: rgb(255 255 255 / 10%); border-color: rgb(255 255 255 / 14%); color: #fff; }
+    body.photo .search input::placeholder, body.photo .search .i { color: rgb(255 255 255 / 55%); }
+    body.photo .search input:hover { border-color: rgb(255 255 255 / 25%); }
+    body.photo .search input:focus { background: rgb(255 255 255 / 16%); border-color: rgb(255 255 255 / 35%); box-shadow: none; }
+    body.photo .search kbd { background: transparent; color: rgb(255 255 255 / 60%); border-color: rgb(255 255 255 / 20%); }
+    body.photo .btn { background: rgb(255 255 255 / 8%); border-color: rgb(255 255 255 / 14%); color: #fff; }
+    body.photo .btn:hover { background: rgb(255 255 255 / 16%); border-color: rgb(255 255 255 / 22%); }
+    body.photo .btn .i { color: rgb(255 255 255 / 75%); }
+    body.photo .btn.danger:hover { background: var(--danger-soft); border-color: rgb(248 113 113 / 35%); color: var(--danger); }
+    body.photo nav button { color: rgb(255 255 255 / 85%); border-color: rgb(255 255 255 / 14%); }
+    body.photo nav button .i, body.photo nav .count, body.photo nav .label { color: rgb(255 255 255 / 50%); }
+    body.photo nav button:hover { background: rgb(255 255 255 / 9%); }
+    body.photo nav button.active { background: rgb(255 255 255 / 16%); color: #fff; }
+    body.photo nav button.active .i, body.photo nav button.active .count { color: #fff; }
+
+    body.photo .heading h2 { text-shadow: 0 1px 10px rgb(0 0 0 / 40%); }
+    body.photo .pill { background: rgb(255 255 255 / 14%); color: rgb(255 255 255 / 80%); }
+    body.photo ul { backdrop-filter: blur(16px) saturate(140%); box-shadow: 0 8px 30px rgb(0 0 0 / 25%); }
+    body.photo li:hover { background: rgb(255 255 255 / 7%); }
+    body.photo .fav { background: rgb(255 255 255 / 92%); border-color: transparent; } /* icons need a light tile */
+    body.photo .chip:hover { color: #fff; }
+    body.photo .icon-btn:hover { background: rgb(255 255 255 / 12%); color: #fff; }
+    body.photo .icon-btn.done { color: #86efac; }
+    body.photo .empty .circle { background: rgb(255 255 255 / 12%); }
+    body.photo .empty { text-shadow: 0 1px 8px rgb(0 0 0 / 40%); }
+    body.photo .rename-input { background: rgb(16 20 28 / 70%); }
+    body.photo .home-settings { background: #1b2029; border: 1px solid rgb(255 255 255 / 10%); }
+    body.photo .home-settings label { color: rgb(255 255 255 / 80%); }
+    body.photo .home-settings select, body.photo .home-settings input { background: rgb(255 255 255 / 6%); }
+    /* Slim scrollbars: no arrow buttons, a soft thumb that brightens while you hover the area. */
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+    ::-webkit-scrollbar-button { display: none; }
+    ::-webkit-scrollbar-thumb {
+      background: rgb(255 255 255 / 10%); border-radius: 10px;
+      border: 3px solid transparent; background-clip: padding-box;
+    }
+    nav:hover::-webkit-scrollbar-thumb, main:hover::-webkit-scrollbar-thumb { background-color: rgb(255 255 255 / 28%); }
+    ::-webkit-scrollbar-thumb:hover { background-color: rgb(255 255 255 / 45%) !important; }
+
+    /* The dropdown list is drawn by Windows: give options a solid dark background. */
+    body.photo select option { background: #1b2029; color: #f4f4f5; }
+    body.photo select option:checked { background: #2d3a55; color: #fff; }
+    .glass-btn[aria-pressed="true"] { background: rgb(255 255 255 / 22%); border-color: rgb(255 255 255 / 40%); }
+    body.photo #toast { background: rgb(30 34 44 / 95%); border: 1px solid rgb(255 255 255 / 10%); }
+    .home-content {
+      position: relative; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 24px 24px 72px; text-align: center; text-shadow: 0 1px 12px rgb(0 0 0 / 35%);
+    }
+    .greet { font-size: 18px; font-weight: 500; opacity: .9; }
+    .big-time { font-size: clamp(64px, 11vw, 132px); font-weight: 300; line-height: 1; letter-spacing: -.03em; margin: 6px 0 8px; font-variant-numeric: tabular-nums; }
+    .big-time span { font-size: .28em; font-weight: 500; letter-spacing: 0; margin-left: 6px; opacity: .85; vertical-align: .9em; }
+    .big-date { font-size: 17px; opacity: .9; }
+    .zones { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 36px; }
+    .zone {
+      width: 190px; padding: 14px 16px; text-align: left; text-shadow: none;
+      border: 1px solid rgb(255 255 255 / 22%); border-radius: 14px;
+      background: rgb(20 24 32 / 28%); backdrop-filter: blur(14px) saturate(140%);
+    }
+    .zone-top { display: flex; justify-content: space-between; align-items: center; font-size: 13px; opacity: .9; }
+    .abbr { font-size: 11px; font-weight: 600; letter-spacing: .04em; padding: 1px 7px; border-radius: 6px; background: rgb(255 255 255 / 18%); }
+    .zone-time { font-size: 30px; font-weight: 500; margin: 4px 0 2px; letter-spacing: -.01em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .zone-meta { font-size: 12px; opacity: .75; }
+    .home-bar {
+      position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; padding: 14px 18px;
+    }
+    .credit { color: rgb(255 255 255 / 80%); font-size: 12px; text-decoration: none; text-shadow: 0 1px 6px rgb(0 0 0 / 50%); }
+    .credit:hover { color: #fff; text-decoration: underline; }
+    .home-tools { display: flex; gap: 6px; }
+    .glass-btn {
+      width: 34px; height: 34px; display: grid; place-items: center; color: #fff;
+      border: 1px solid rgb(255 255 255 / 22%); border-radius: 9px; background: rgb(20 24 32 / 30%); backdrop-filter: blur(10px);
+    }
+    .glass-btn:hover { background: rgb(20 24 32 / 50%); }
+    .home-settings {
+      position: absolute; right: 18px; bottom: 60px; width: 300px; display: grid; gap: 12px; padding: 16px;
+      color: var(--text); background: var(--surface); border-radius: 12px; box-shadow: 0 12px 40px rgb(0 0 0 / 30%);
+    }
+    .home-settings label { display: grid; gap: 5px; font-size: 12px; font-weight: 600; color: #3f3f46; }
+    .home-settings .opt { font-weight: 400; color: var(--faint); }
+    .home-settings select, .home-settings input {
+      height: 34px; padding: 0 10px; font: inherit; font-weight: 400; color: var(--text);
+      border: 1px solid var(--border); border-radius: 8px; background: var(--surface); outline: none;
+    }
+    .home-settings select:focus, .home-settings input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+    .home-settings .note { margin: 0; font-size: 12px; color: var(--danger); }
+    .home-settings .note:empty { display: none; }
+    .primary-btn { justify-content: center; background: var(--accent); border-color: var(--accent); color: #fff; }
+    .primary-btn:hover { background: #1d4ed8; border-color: #1d4ed8; }
+
+    /* ---------- Narrow windows: folders become a scrollable strip ---------- */
+    @media (max-width: 760px) {
+      header { flex-wrap: wrap; height: auto; padding: 12px 16px; gap: 12px; }
+      .brand { width: auto; }
+      .search { order: 3; flex-basis: 100%; max-width: none; }
+      .btn span { display: none; }
+      .layout { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+      nav { display: flex; gap: 6px; overflow-x: auto; padding: 10px 12px; border-right: 0; border-bottom: 1px solid var(--border); }
+      nav .label { display: none; }
+      nav button { width: auto; flex: none; border: 1px solid var(--border); }
+      nav button.active { border-color: var(--accent-ring); }
+      main { padding: 18px 12px 32px; }
+      .zone { width: calc(50% - 6px); padding: 12px; }
+      .zone-time { font-size: 22px; }
+      .home-settings { left: 12px; right: 12px; width: auto; }
+      .chip { display: none; }
+      .folder-actions .btn span { display: none; }
+      .row-actions { opacity: 1; }
+    }
+  </style>
+</head>
+<body class="photo">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol>
+    <symbol id="i-all" viewBox="0 0 24 24"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m2 12.65 9.17 4.16a2 2 0 0 0 1.66 0L22 12.65"/><path d="m2 17.65 9.17 4.16a2 2 0 0 0 1.66 0L22 17.65"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect width="13" height="13" x="9" y="9" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5z"/></symbol>
+    <symbol id="i-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+    <symbol id="i-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M21.17 6.81a1 1 0 0 0-3.98-3.98L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z"/><path d="m15 5 4 4"/></symbol>
+    <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z"/></symbol>
+  </svg>
+
+  <!-- Home tab: photo behind the whole page (home.js swaps the two layers) -->
+  <div class="page-bg" aria-hidden="true">
+    <div class="bg" id="bgA"></div>
+    <div class="bg" id="bgB"></div>
+    <div class="shade"></div>
+  </div>
+
+  <header>
+    <div class="brand"><img src="icons/icon128.png" alt="">Bookmarks</div>
+    <label class="search">
+      <svg class="i"><use href="#i-search"/></svg>
+      <input id="q" type="search" placeholder="Search by title, URL or folder" aria-label="Search bookmarks" autocomplete="off">
+      <kbd>/</kbd>
+    </label>
+    <div class="actions">
+      <button class="btn" id="import" title="Import JSON"><svg class="i"><use href="#i-upload"/></svg><span>Import</span></button>
+      <button class="btn" id="export" title="Export JSON"><svg class="i"><use href="#i-download"/></svg><span>Export</span></button>
+      <input id="file" type="file" accept=".json,application/json" hidden>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav id="nav" aria-label="Folders"></nav>
+    <main id="main">
+      <section id="home" class="home" hidden>
+        <div class="home-content">
+          <div class="greet" id="greet"></div>
+          <div class="big-time" id="bigTime"> <span id="bigAmpm"></span></div>
+          <div class="big-date" id="bigDate"></div>
+          <div class="zones" id="zones"></div>
+        </div>
+        <div class="home-bar">
+          <a class="credit" id="credit" target="_blank" rel="noopener"></a>
+          <div class="home-tools">
+            <button class="glass-btn" id="homePrev" title="Previous photo"><svg class="i"><use href="#i-left"/></svg></button>
+            <button class="glass-btn" id="homePause" title="Pause slideshow" aria-pressed="false"><svg class="i"><use href="#i-pause"/></svg></button>
+            <button class="glass-btn" id="homeNext" title="Next photo"><svg class="i"><use href="#i-right"/></svg></button>
+            <button class="glass-btn" id="homeSettingsBtn" title="Slideshow settings"><svg class="i"><use href="#i-sliders"/></svg></button>
+          </div>
+        </div>
+        <form class="home-settings" id="homeSettings" hidden>
+          <strong>Slideshow</strong>
+          <label>Change photo every
+            <select id="hsInterval">
+              <option value="15">15 seconds</option>
+              <option value="30">30 seconds</option>
+              <option value="60">1 minute</option>
+              <option value="300">5 minutes</option>
+              <option value="900">15 minutes</option>
+              <option value="3600">1 hour</option>
+            </select>
+          </label>
+          <label>Unsplash collection ID
+            <input id="hsCollection" autocomplete="off" placeholder="1263731">
+          </label>
+          <label>Unsplash Access Key <span class="opt">optional, for fresh photos</span>
+            <input id="hsKey" autocomplete="off" spellcheck="false" placeholder="Leave empty to use built-in photos">
+          </label>
+          <p class="note" id="homeNote"></p>
+          <button class="btn small primary-btn" type="submit">Save</button>
+        </form>
+      </section>
+      <div class="wrap" id="wrap">
+        <div class="heading">
+          <h2 id="title"></h2>
+          <input id="renameInput" class="rename-input" aria-label="Folder name" autocomplete="off" hidden>
+          <span class="pill" id="sub"></span>
+          <div class="folder-actions" id="folderActions" hidden>
+            <button class="btn small" id="renameBtn" title="Rename folder"><svg class="i"><use href="#i-pencil"/></svg><span>Rename</span></button>
+            <button class="btn small danger" id="deleteBtn" title="Delete folder"><svg class="i"><use href="#i-trash"/></svg><span>Delete folder</span></button>
+          </div>
+        </div>
+        <ul id="list"></ul>
+        <div id="empty" class="empty" hidden>
+          <div class="circle"><svg class="i" id="empty-icon"><use href="#i-bookmark"/></svg></div>
+          <strong id="empty-title"></strong>
+          <span id="empty-text"></span>
+        </div>
+      </div>
+    </main>
+  </div>
+  <div id="toast" role="status"></div>
+
+  <script src="shared.js"></script>
+  <script src="bookmarks.js"></script>
+  <script src="home.js"></script>
+</body>
+</html>
