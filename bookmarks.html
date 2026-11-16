@@ -99,17 +99,15 @@
     }
 
     ul {
-      list-style: none; margin: 0; padding: 4px; background: var(--surface);
-      border: 1px solid var(--border); border-radius: var(--radius);
-      box-shadow: 0 1px 2px rgb(16 16 24 / 4%);
+      list-style: none; margin: 0; padding: 0;
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px;
     }
     li {
-      position: relative; display: flex; align-items: center; gap: 14px;
-      padding: 10px 12px; border-radius: 9px; transition: background .12s;
+      position: relative; display: grid; grid-template-columns: 34px minmax(0, 1fr); align-items: center; gap: 8px 12px;
+      padding: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+      box-shadow: 0 1px 2px rgb(16 16 24 / 4%); transition: background .12s, border-color .12s, transform .12s;
     }
-    li + li { box-shadow: 0 -1px 0 var(--line); }
-    li:hover { background: #f8f8fa; box-shadow: none; }
-    li:hover + li { box-shadow: none; }
+    li:hover { background: #f8f8fa; transform: translateY(-1px); }
     .fav {
       width: 34px; height: 34px; flex: none; display: grid; place-items: center;
       border: 1px solid var(--line); border-radius: 9px; background: var(--surface); overflow: hidden;
@@ -127,15 +125,18 @@
     .meta { color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     .chip {
-      position: relative; z-index: 1; flex: none; display: inline-flex; align-items: center; gap: 5px;
-      max-width: 200px; height: 26px; padding: 0 9px; font-size: 12px; color: var(--muted);
+      position: relative; z-index: 1; grid-column: 1 / -1; justify-self: start; display: inline-flex; align-items: center; gap: 5px;
+      max-width: 100%; height: 26px; padding: 0 9px; font-size: 12px; color: var(--muted);
       border: 1px solid var(--border); border-radius: 7px; background: var(--surface);
     }
     .chip .i { width: 13px; height: 13px; }
     .chip span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .chip:hover { color: var(--accent); border-color: var(--accent-ring); background: var(--accent-soft); }
 
-    .row-actions { position: relative; z-index: 1; display: flex; gap: 2px; opacity: 0; transition: opacity .12s; }
+    .row-actions {
+      position: absolute; z-index: 1; top: 6px; right: 6px; display: flex; gap: 2px; padding: 2px;
+      border-radius: 10px; background: inherit; opacity: 0; transition: opacity .12s;
+    }
     li:hover .row-actions, .row-actions:focus-within { opacity: 1; }
     .icon-btn {
       width: 32px; height: 32px; display: grid; place-items: center;
@@ -215,8 +216,9 @@
 
     body.photo .heading h2 { text-shadow: 0 1px 10px rgb(0 0 0 / 40%); }
     body.photo .pill { background: rgb(255 255 255 / 14%); color: rgb(255 255 255 / 80%); }
-    body.photo ul { backdrop-filter: blur(16px) saturate(140%); box-shadow: 0 8px 30px rgb(0 0 0 / 25%); }
-    body.photo li:hover { background: rgb(255 255 255 / 7%); }
+    body.photo li { backdrop-filter: blur(16px) saturate(140%); box-shadow: 0 6px 20px rgb(0 0 0 / 22%); }
+    body.photo li:hover { background: rgb(40 40 46 / 82%); border-color: rgb(255 255 255 / 22%); }
+    body.photo .row-actions { background: rgb(30 30 36 / 92%); }
     body.photo .fav { background: rgb(255 255 255 / 92%); border-color: transparent; } /* icons need a light tile */
     body.photo .chip:hover { color: #fff; }
     body.photo .icon-btn:hover { background: rgb(255 255 255 / 12%); color: #fff; }
@@ -306,7 +308,8 @@
       .home-settings { left: 12px; right: 12px; width: auto; }
       .chip { display: none; }
       .folder-actions .btn span { display: none; }
-      .row-actions { opacity: 1; }
+      li { grid-template-columns: 34px minmax(0, 1fr) auto; }
+      .row-actions { opacity: 1; position: static; padding: 0; background: none !important; }
     }
   </style>
 </head>
