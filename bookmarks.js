@@ -53,11 +53,13 @@ fetch(chrome.runtime.getURL('manifest.json')).then(r => r.json()).then(async m =
 chrome.tabs.getCurrent(t => t && !t.pinned && chrome.tabs.update(t.id, { pinned: true }));
 
 let data = { bookmarks: [], folders: [], todos: [], notes: [] };
+let draft = null; // unsaved new note, see Notes below
 let selected = HOME; // the page always opens on Home
 
 async function load() {
   const { bookmarks = [], folders = [], todos = [], notes = [] } = await chrome.storage.local.get(['bookmarks', 'folders', 'todos', 'notes']);
-  data = { bookmarks, folders: [...new Set([...folders, ...bookmarks.map(folderOf)])], todos, notes };
+  data = { bookmarks, folders: [...new Set([...folders, ...bookmarks.map(folderOf)])], todos,
+    notes: draft && !notes.some(n => n.id === draft.id) ? [draft, ...notes] : notes };
   if (![ALL, HOME, TODO, NOTES].includes(selected) && !data.folders.includes(selected)) selected = ALL;
   render();
 }
@@ -143,6 +145,7 @@ function render() {
   const todoMode = !q && selected === TODO;
   $('todo').hidden = !todoMode;
   const notesMode = !q && selected === NOTES;
+  if (!notesMode) dropDraft();
   $('notes').hidden = !notesMode;
   if (homeMode) return;
   if (todoMode) { $('wrap').hidden = true; return renderTodos(); }
@@ -329,6 +332,14 @@ $('todoClear').onclick = async () => {
 // A note is {id, title, html, body, updated}. html is the formatted text; body is the same as plain
 // text for the list preview. Notes from before formatting have only body.
 let noteId = null; // the open note
+// A new note stays a draft (not saved, not synced) until you type in it, so clicking
+// New note and walking away doesn't leave an empty "Untitled" behind.
+const isEmptyNote = n => !n.title.trim() && !(n.body || '').trim();
+function dropDraft(keepId) {
+  if (!draft || draft.id === keepId) return;
+  data.notes = data.notes.filter(n => n.id !== draft.id);
+  draft = null;
+}
 let noteTimer;
 const when = iso => {
   const d = new Date(iso);
@@ -362,6 +373,12 @@ function cleanHtml(html) {
 }
 
 function renderNotes() {
+  const typingIn = $('noteEditor').contains(document.activeElement) ? noteId : null;
+  const junk = data.notes.filter(n => n.id !== draft?.id && n.id !== typingIn && isEmptyNote(n));
+  if (junk.length) {
+    data.notes = data.notes.filter(n => !junk.includes(n));
+    chrome.storage.local.set({ notes: data.notes.filter(n => n.id !== draft?.id) });
+  }
   const notes = [...data.notes].sort((a, b) => b.updated.localeCompare(a.updated)); // last edited on top
   if (!notes.some(n => n.id === noteId)) noteId = notes[0]?.id ?? null;
   $('notesSub').textContent = plural(notes.length, 'note');
@@ -374,7 +391,7 @@ function renderNotes() {
       el('span', { textContent: (n.body || '').trim().slice(0, 90) || 'No text' }),
       el('small', { textContent: when(n.updated) })
     );
-    b.onclick = () => { flushNote(); noteId = n.id; renderNotes(); };
+    b.onclick = () => { flushNote(); dropDraft(n.id); noteId = n.id; renderNotes(); };
     return b;
   }));
   const n = notes.find(x => x.id === noteId);
@@ -401,9 +418,11 @@ function flushNote() {
   if (n.title === title && html === ed.dataset.loaded) return;
   ed.dataset.loaded = html;
   const body = $('noteText').innerText;
+  if (draft?.id === n.id && !title.trim() && !body.trim()) return; // still blank: keep it a draft
   data.notes = data.notes.map(x => (x.id === n.id ? { ...x, title, html, body, updated: new Date().toISOString() } : x));
+  if (draft?.id === n.id) draft = null;
   $('noteSaved').textContent = 'Saved';
-  chrome.storage.local.set({ notes: data.notes });
+  chrome.storage.local.set({ notes: data.notes.filter(x => x.id !== draft?.id) });
 }
 function onNoteInput() {
   const t = $('noteText');
@@ -442,10 +461,11 @@ const listOf = () => {
 };
 const isHeading = () => /^h2$/i.test(document.queryCommandValue('formatBlock'));
 function updateTools() {
+  const inNote = $('noteText').contains(getSelection().anchorNode);
   for (const b of document.querySelectorAll('#noteTools [data-cmd]')) {
     const c = b.dataset.cmd;
     let on = false;
-    try {
+    if (inNote) try {
       on = c === 'heading' ? isHeading()
         : c === 'checklist' ? !!listOf()?.classList.contains('checklist')
         : c === 'insertUnorderedList' ? !!listOf() && !listOf().classList.contains('checklist')
@@ -481,19 +501,23 @@ $('noteTools').addEventListener('click', e => {
 
 const newNote = () => {
   flushNote();
-  const n = { id: crypto.randomUUID(), title: '', html: '', body: '', updated: new Date().toISOString() };
-  data.notes = [n, ...data.notes];
-  noteId = n.id;
+  if (!draft) {
+    draft = { id: crypto.randomUUID(), title: '', html: '', body: '', updated: new Date().toISOString() };
+    data.notes = [draft, ...data.notes];
+  }
+  noteId = draft.id;
   renderNotes();
+  $('noteSaved').textContent = 'New note';
   $('noteTitle').focus();
-  chrome.storage.local.set({ notes: data.notes });
 };
 $('newNote').onclick = $('newNoteEmpty').onclick = newNote;
 
 $('deleteNote').onclick = async () => {
   const n = data.notes.find(x => x.id === noteId);
-  if (!n || !confirm(`Delete "${n.title.trim() || 'Untitled'}"?`)) return;
+  if (!n) return;
   clearTimeout(noteTimer);
+  if (n.id === draft?.id) { dropDraft(); noteId = null; return renderNotes(); } // never saved: nothing to confirm
+  if (!confirm(`Delete "${n.title.trim() || 'Untitled'}"?`)) return;
   const before = await chrome.storage.local.get('notes');
   await chrome.storage.local.set({ notes: data.notes.filter(x => x.id !== n.id) });
   toast('Note deleted', { label: 'Undo', run: () => { noteId = n.id; chrome.storage.local.set(before); } });
