@@ -13,6 +13,10 @@ A Chrome extension (Manifest V3) for saving pages into folders, with a bookmarks
 - **Import** on the bookmarks page accepts this extension's JSON export or a Bonjourr backup.
 - Or put a `bookmarks.json` (same format as **Export**) in this folder and reload the extension. It's merged in once and is git-ignored, so personal links stay out of the repo.
 
+## Sync between browsers
+
+Click **Sync** on the bookmarks page and paste a GitHub token that has only the `gist` permission. Do the same in each browser (Chrome, Edge, another PC) with the same token. Links are kept in a secret Gist named `url-bookmarker.json`. Each browser syncs every minute and right after a change. Deletes and folder renames sync too.
+
 Every change is also backed up to `Downloads/URL Bookmarker/bookmarks.json`.
 
 ## Files

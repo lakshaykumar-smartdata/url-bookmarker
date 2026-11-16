@@ -225,7 +225,7 @@ $('deleteBtn').onclick = async () => {
 
 $('q').oninput = render;
 document.addEventListener('keydown', e => {
-  if (e.key === '/' && document.activeElement !== $('q')) { e.preventDefault(); $('q').focus(); }
+  if (e.key === '/' && !/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) { e.preventDefault(); $('q').focus(); }
   if (e.key === 'Escape' && document.activeElement === $('q')) { $('q').value = ''; render(); }
 });
 
@@ -242,4 +242,42 @@ $('file').onchange = async () => {
 };
 
 seedFromBundle().finally(load); // also here, in case the background import didn't run
-chrome.storage.onChanged.addListener(load);
+chrome.storage.onChanged.addListener(c => (c.bookmarks || c.folders) && load());
+
+// ---------- Sync (the work happens in background.js) ----------
+async function showSync() {
+  const { syncSettings, syncStatus = {} } = await chrome.storage.local.get(['syncSettings', 'syncStatus']);
+  const on = !!syncSettings?.token, err = on && syncStatus.error;
+  const time = syncStatus.at && new Date(syncStatus.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  $('syncOff').hidden = !on;
+  $('syncNote').textContent = err || '';
+  $('syncState').textContent = !on ? 'Sync is off.' : time ? `Last synced at ${time}.` : 'Syncing…';
+  $('syncBtn').classList.toggle('on', on && !err);
+  $('syncBtn').classList.toggle('err', !!err);
+  $('syncBtn').title = !on ? 'Sync is off' : err ? `Sync problem: ${err}` : time ? `Synced at ${time}` : 'Syncing…';
+}
+$('syncBtn').onclick = async () => {
+  const open = $('syncPanel').hidden;
+  $('syncPanel').hidden = !open;
+  if (!open) return;
+  $('syncToken').value = (await chrome.storage.local.get('syncSettings')).syncSettings?.token || '';
+  showSync();
+  $('syncToken').focus();
+};
+$('syncPanel').onsubmit = async e => {
+  e.preventDefault();
+  const token = $('syncToken').value.trim();
+  if (!token) return ($('syncNote').textContent = 'Paste a GitHub token first.');
+  const { syncSettings } = await chrome.storage.local.get('syncSettings');
+  const gistId = syncSettings?.token === token ? syncSettings.gistId : undefined; // new token: find the Gist again
+  await chrome.storage.local.set({ syncSettings: { token, gistId }, syncStatus: {} });
+  chrome.runtime.sendMessage({ sync: true }).catch(() => {});
+};
+$('syncOff').onclick = async () => {
+  await chrome.storage.local.remove(['syncSettings', 'syncStatus']);
+  $('syncToken').value = '';
+  toast('Sync turned off. Your links stay here.');
+};
+chrome.storage.onChanged.addListener(c => (c.syncSettings || c.syncStatus) && showSync());
+document.addEventListener('visibilitychange', () => document.hidden || chrome.runtime.sendMessage({ sync: true }).catch(() => {}));
+showSync();
