@@ -73,7 +73,7 @@ function mergeSync(a, b) {
 const syncFingerprint = s => JSON.stringify([
   s.bookmarks.map(bKey).sort(), [...s.folders].sort(), s.stamps,
   (s.todos || []).map(t => JSON.stringify([t.id, t.text, t.done])).sort(),
-  (s.notes || []).map(n => JSON.stringify([n.id, n.title, n.body])).sort(),
+  (s.notes || []).map(n => JSON.stringify([n.id, n.title, n.html ?? n.body])).sort(),
 ]);
 
 // Merge the bundled bookmarks.json into storage. Skipped if the file hasn't changed

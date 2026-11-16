@@ -326,6 +326,8 @@ $('todoClear').onclick = async () => {
 };
 
 // ---------- Notes (synced with the Gist like bookmarks) ----------
+// A note is {id, title, html, body, updated}. html is the formatted text; body is the same as plain
+// text for the list preview. Notes from before formatting have only body.
 let noteId = null; // the open note
 let noteTimer;
 const when = iso => {
@@ -334,6 +336,30 @@ const when = iso => {
     ? d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
     : d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
 };
+const textToHtml = s => (s || '').split('\n').map(l => `<div>${el('div', { textContent: l }).innerHTML || '<br>'}</div>`).join('');
+
+// Keep only simple formatting. Notes come from the Gist and from pasted web pages, so drop
+// scripts, styles, colours, images and every attribute except links and checklist ticks.
+const NOTE_TAGS = new Set(['B', 'STRONG', 'I', 'EM', 'U', 'S', 'STRIKE', 'H1', 'H2', 'H3', 'P', 'DIV', 'BR', 'UL', 'OL', 'LI', 'A', 'BLOCKQUOTE', 'CODE', 'PRE']);
+const DROP_WITH_CONTENT = new Set(['SCRIPT', 'STYLE', 'TEMPLATE', 'IFRAME', 'OBJECT', 'EMBED', 'SVG', 'MATH', 'HEAD', 'TITLE', 'META', 'LINK']);
+function cleanHtml(html) {
+  const t = document.createElement('template');
+  t.innerHTML = html;
+  const walk = node => {
+    for (const c of [...node.children]) {
+      walk(c);
+      const tag = c.tagName.toUpperCase();
+      if (!NOTE_TAGS.has(tag)) { c.replaceWith(...(DROP_WITH_CONTENT.has(tag) ? [] : c.childNodes)); continue; }
+      const cls = [...c.classList].filter(x => x === 'checklist' || x === 'checked');
+      for (const a of [...c.attributes]) {
+        if (!(a.name === 'href' && tag === 'A' && /^(https?:|mailto:)/i.test(a.value.trim()))) c.removeAttribute(a.name);
+      }
+      if (cls.length) c.className = cls.join(' ');
+    }
+  };
+  walk(t.content);
+  return t.innerHTML;
+}
 
 function renderNotes() {
   const notes = [...data.notes].sort((a, b) => b.updated.localeCompare(a.updated)); // last edited on top
@@ -345,7 +371,7 @@ function renderNotes() {
     const b = el('button', { className: `note-item${n.id === noteId ? ' active' : ''}` });
     b.append(
       el('strong', { textContent: n.title.trim() || 'Untitled' }),
-      el('span', { textContent: n.body.trim().slice(0, 90) || 'No text' }),
+      el('span', { textContent: (n.body || '').trim().slice(0, 90) || 'No text' }),
       el('small', { textContent: when(n.updated) })
     );
     b.onclick = () => { flushNote(); noteId = n.id; renderNotes(); };
@@ -358,35 +384,104 @@ function renderNotes() {
   if (ed.dataset.id !== n.id || !ed.contains(document.activeElement)) {
     ed.dataset.id = n.id;
     $('noteTitle').value = n.title;
-    $('noteText').value = n.body;
+    $('noteText').innerHTML = cleanHtml(n.html ?? textToHtml(n.body));
+    ed.dataset.loaded = $('noteText').innerHTML; // so just opening a note doesn't count as an edit
     $('noteSaved').textContent = `Edited ${when(n.updated)}`;
+    updateTools();
   }
 }
 
 // Saves 0.6 s after you stop typing, and when you leave the note.
 function flushNote() {
   clearTimeout(noteTimer);
-  const id = $('noteEditor').dataset.id;
-  const n = data.notes.find(x => x.id === id);
+  const ed = $('noteEditor');
+  const n = data.notes.find(x => x.id === ed.dataset.id);
   if (!n) return;
-  const title = $('noteTitle').value, body = $('noteText').value;
-  if (n.title === title && n.body === body) return;
-  data.notes = data.notes.map(x => (x.id === id ? { ...x, title, body, updated: new Date().toISOString() } : x));
+  const title = $('noteTitle').value, html = $('noteText').innerHTML;
+  if (n.title === title && html === ed.dataset.loaded) return;
+  ed.dataset.loaded = html;
+  const body = $('noteText').innerText;
+  data.notes = data.notes.map(x => (x.id === n.id ? { ...x, title, html, body, updated: new Date().toISOString() } : x));
   $('noteSaved').textContent = 'Saved';
   chrome.storage.local.set({ notes: data.notes });
 }
-$('noteTitle').oninput = $('noteText').oninput = () => {
+function onNoteInput() {
+  const t = $('noteText');
+  if (/^(<br>|<div><br><\/div>)$/.test(t.innerHTML)) t.innerHTML = ''; // so the placeholder comes back
   $('noteSaved').textContent = 'Saving…';
   clearTimeout(noteTimer);
   noteTimer = setTimeout(flushNote, 600);
-};
+}
+$('noteTitle').oninput = $('noteText').oninput = onNoteInput;
 $('noteEditor').addEventListener('focusout', flushNote);
 $('noteTitle').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); $('noteText').focus(); } };
 window.addEventListener('beforeunload', flushNote);
 
+// Pasting from a web page keeps bold/lists/links but not its fonts and colours.
+$('noteText').addEventListener('paste', e => {
+  const html = e.clipboardData.getData('text/html');
+  if (!html) return; // plain text pastes as it is
+  e.preventDefault();
+  document.execCommand('insertHTML', false, cleanHtml(html));
+});
+
+$('noteText').addEventListener('click', e => {
+  const a = e.target.closest('a');
+  if (a && (e.ctrlKey || e.metaKey)) return window.open(a.href, '_blank', 'noopener');
+  // The tick box is drawn just left of the list item.
+  const li = e.target.closest('ul.checklist > li');
+  if (li && e.clientX < li.getBoundingClientRect().left) { li.classList.toggle('checked'); onNoteInput(); }
+});
+
+// ---------- Formatting toolbar ----------
+// ponytail: execCommand is deprecated but every Chromium browser supports it; swap for a
+// small editor library if it is ever removed.
+const listOf = () => {
+  const n = getSelection().anchorNode;
+  return (n?.nodeType === 1 ? n : n?.parentElement)?.closest('#noteText ul');
+};
+const isHeading = () => /^h2$/i.test(document.queryCommandValue('formatBlock'));
+function updateTools() {
+  for (const b of document.querySelectorAll('#noteTools [data-cmd]')) {
+    const c = b.dataset.cmd;
+    let on = false;
+    try {
+      on = c === 'heading' ? isHeading()
+        : c === 'checklist' ? !!listOf()?.classList.contains('checklist')
+        : c === 'insertUnorderedList' ? !!listOf() && !listOf().classList.contains('checklist')
+        : ['bold', 'italic', 'underline', 'strikeThrough', 'insertOrderedList'].includes(c) && document.queryCommandState(c);
+    } catch {}
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', on);
+  }
+}
+document.addEventListener('selectionchange', () => $('noteText').contains(getSelection().anchorNode) && updateTools());
+
+$('noteTools').addEventListener('mousedown', e => e.preventDefault()); // keep the text selected
+$('noteTools').addEventListener('click', e => {
+  const cmd = e.target.closest('button')?.dataset.cmd;
+  if (!cmd) return;
+  if (!$('noteText').contains(getSelection().anchorNode)) $('noteText').focus();
+  if (cmd === 'heading') document.execCommand('formatBlock', false, isHeading() ? 'div' : 'h2');
+  else if (cmd === 'checklist') {
+    if (listOf()?.classList.contains('checklist')) document.execCommand('insertUnorderedList'); // turn it off
+    else {
+      if (!listOf()) document.execCommand('insertUnorderedList');
+      listOf()?.classList.add('checklist');
+    }
+  } else if (cmd === 'insertUnorderedList' && listOf()?.classList.contains('checklist')) {
+    listOf().classList.remove('checklist'); // checklist -> plain bullets
+  } else if (cmd === 'createLink') {
+    const url = prompt('Link address (Ctrl+click a link to open it)', 'https://')?.trim();
+    if (url && /^(https?:|mailto:)/i.test(url)) document.execCommand('createLink', false, url);
+  } else document.execCommand(cmd);
+  onNoteInput();
+  updateTools();
+});
+
 const newNote = () => {
   flushNote();
-  const n = { id: crypto.randomUUID(), title: '', body: '', updated: new Date().toISOString() };
+  const n = { id: crypto.randomUUID(), title: '', html: '', body: '', updated: new Date().toISOString() };
   data.notes = [n, ...data.notes];
   noteId = n.id;
   renderNotes();
