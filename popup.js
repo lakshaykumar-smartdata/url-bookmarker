@@ -1,12 +1,30 @@
 const $ = id => document.getElementById(id);
 let tab;
+let savedIn = []; // folders that already hold this page
+
+// Same page even if the URL differs by a trailing slash or #fragment.
+const sameUrl = (a, b) => {
+  const n = u => { try { const x = new URL(u); x.hash = ''; return x.href.replace(/\/$/, ''); } catch { return u; } };
+  return n(a) === n(b);
+};
+const listFolders = names => names.length <= 2 ? names.join(' and ') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
 
 const target = () => $('newFolder').value.trim() || $('folder').value;
-const updateLabel = () => { $('saveLabel').textContent = target() ? `Save to ${target()}` : 'Save bookmark'; };
+const updateLabel = () => {
+  const exists = savedIn.includes(target());
+  $('save').classList.toggle('exists', exists);
+  $('save').querySelector('use').setAttribute('href', exists ? '#i-check' : '#i-bookmark');
+  $('saveLabel').textContent = exists ? `Already in ${target()}` : target() ? `Save to ${target()}` : 'Save bookmark';
+};
 
 (async () => {
   [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  const { folders = [], lastFolder } = await chrome.storage.local.get(['folders', 'lastFolder']);
+  const { folders = [], lastFolder, bookmarks = [] } = await chrome.storage.local.get(['folders', 'lastFolder', 'bookmarks']);
+  savedIn = tab?.url ? [...new Set(bookmarks.filter(b => sameUrl(b.url, tab.url)).map(b => b.folder || 'Unsorted'))] : [];
+  if (savedIn.length) {
+    $('alreadyText').textContent = `Already saved in ${listFolders(savedIn)}`;
+    $('already').hidden = false;
+  }
   $('title').textContent = tab?.title || 'Untitled page';
   let shown = tab?.url || 'No URL on this tab';
   try { const u = new URL(tab.url); shown = u.hostname.replace(/^www\./, '') + u.pathname.replace(/\/$/, ''); } catch {}
@@ -14,7 +32,8 @@ const updateLabel = () => { $('saveLabel').textContent = target() ? `Save to ${t
   $('url').title = tab?.url || '';
   if (tab?.url) $('icon').replaceWith(Object.assign(siteIcon(tab.url, '', tab.favIconUrl), { id: 'icon' }));
 
-  $('folder').replaceChildren(...folders.map(f => new Option(f, f, false, f === lastFolder)));
+  const preselect = savedIn.find(f => folders.includes(f)) ?? lastFolder; // show where it already is
+  $('folder').replaceChildren(...folders.map(f => new Option(f, f, false, f === preselect)));
   $('pick').hidden = !folders.length;
   (folders.length ? $('folder') : $('newFolder')).focus();
   updateLabel();
@@ -29,8 +48,8 @@ $('form').onsubmit = async e => {
   if (!folder) return ($('status').textContent = 'Type a folder name first.');
 
   const { bookmarks = [], folders = [] } = await chrome.storage.local.get(['bookmarks', 'folders']);
-  if (bookmarks.some(b => b.url === tab.url && b.folder === folder)) {
-    return ($('status').textContent = `Already saved in ${folder}.`);
+  if (bookmarks.some(b => sameUrl(b.url, tab.url) && (b.folder || 'Unsorted') === folder)) {
+    return ($('status').textContent = `Already saved in ${folder}. Pick another folder to save a copy.`);
   }
   if (!folders.includes(folder)) folders.push(folder);
   bookmarks.unshift({ url: tab.url, title: tab.title, folder, icon: tab.favIconUrl, savedAt: new Date().toISOString() });
