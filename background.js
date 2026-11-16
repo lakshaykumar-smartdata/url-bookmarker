@@ -81,10 +81,11 @@ chrome.storage.onChanged.addListener((changes, area) => {
     };
     diff(changes.bookmarks, bKey);
     diff(changes.folders, fKey);
-    const { oldValue: was = [], newValue: now_ = [] } = changes.folders || {};
-    if (was.length === now_.length && was.join('\n') !== now_.join('\n') && was.every(f => now_.includes(f))) {
-      syncStamps['o:folders'] = { t: now }; // same folders, new order: you dragged one
-    }
+    // You dragged a folder: the folders both lists share are now in a different order.
+    // (Comparing only shared folders still works when a folder was added or renamed at the same time.)
+    const { oldValue: was = [], newValue: is = [] } = changes.folders || {};
+    const shared = list => list.filter(f => was.includes(f) && is.includes(f)).join('\n');
+    if (shared(was) !== shared(is)) syncStamps['o:folders'] = { t: now };
     diff(changes.todos, tKey);
     diff(changes.notes, nKey);
     await chrome.storage.local.set({ syncStamps });
@@ -143,7 +144,19 @@ async function sync() {
 }
 
 chrome.alarms.get('sync', a => a || chrome.alarms.create('sync', { periodInMinutes: 1 }));
-chrome.alarms.onAlarm.addListener(a => a.name === 'sync' && queue(sync));
+chrome.alarms.onAlarm.addListener(a => {
+  if (a.name !== 'sync') return;
+  queue(sync);
+  reloadIfUpdated();
+});
+// New files on disk (git pull, an edit) apply within a minute in every browser, even if the
+// bookmarks tab is never refreshed. The bookmarks tab reopens by itself afterwards.
+async function reloadIfUpdated() {
+  try {
+    const m = await (await fetch(chrome.runtime.getURL('manifest.json'), { cache: 'no-store' })).json();
+    if (m.version !== chrome.runtime.getManifest().version) chrome.runtime.reload();
+  } catch {}
+}
 chrome.runtime.onStartup.addListener(() => queue(sync));
 chrome.runtime.onMessage.addListener((m, _, reply) => {
   if (!m?.sync) return;

@@ -65,8 +65,9 @@ function mergeSync(a, b) {
   const [ownN, freshN] = pick(a.notes, b.notes, nKey);
   const bookmarks = [...freshB, ...ownB]; // links from the other browser go on top, like a new save
   const folders = [...ownF, ...freshF];
-  // Folder order: whoever reordered last wins (stamp 'o:folders'). Folders it doesn't know go last.
-  if ((sb['o:folders']?.t ?? 0) > (sa['o:folders']?.t ?? 0)) {
+  // Folder order: whoever reordered last wins (stamp 'o:folders'). On a tie the Gist's order wins,
+  // so two browsers that disagree always settle on one order. Folders it doesn't know go last.
+  if ((sb['o:folders']?.t ?? 0) >= (sa['o:folders']?.t ?? 0)) {
     const rank = new Map((b.folders || []).map((f, i) => [f, i]));
     folders.sort((x, y) => (rank.get(x) ?? Infinity) - (rank.get(y) ?? Infinity));
   }
@@ -74,9 +75,10 @@ function mergeSync(a, b) {
   return { bookmarks, folders, todos: [...freshT, ...ownT], notes: [...freshN, ...ownN], stamps: Object.fromEntries(Object.entries(stamps).sort(([x], [y]) => (x < y ? -1 : 1))) };
 }
 
-// Order-free fingerprint, so two browsers with the same links in a different order don't keep re-uploading.
+// Fingerprint of what's synced. Link order is ignored, so two browsers with the same links in a
+// different order don't keep re-uploading.
 const syncFingerprint = s => JSON.stringify([
-  s.bookmarks.map(bKey).sort(), [...s.folders].sort(), s.stamps,
+  s.bookmarks.map(bKey).sort(), s.folders, s.stamps, // folder order matters, it's shown in the sidebar
   (s.todos || []).map(t => JSON.stringify([t.id, t.text, t.done])).sort(),
   (s.notes || []).map(n => JSON.stringify([n.id, n.title, n.html ?? n.body])).sort(),
 ]);
