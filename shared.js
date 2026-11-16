@@ -65,6 +65,11 @@ function mergeSync(a, b) {
   const [ownN, freshN] = pick(a.notes, b.notes, nKey);
   const bookmarks = [...freshB, ...ownB]; // links from the other browser go on top, like a new save
   const folders = [...ownF, ...freshF];
+  // Folder order: whoever reordered last wins (stamp 'o:folders'). Folders it doesn't know go last.
+  if ((sb['o:folders']?.t ?? 0) > (sa['o:folders']?.t ?? 0)) {
+    const rank = new Map((b.folders || []).map((f, i) => [f, i]));
+    folders.sort((x, y) => (rank.get(x) ?? Infinity) - (rank.get(y) ?? Infinity));
+  }
   for (const x of bookmarks) if (!folders.includes(x.folder || 'Unsorted')) folders.push(x.folder || 'Unsorted');
   return { bookmarks, folders, todos: [...freshT, ...ownT], notes: [...freshN, ...ownN], stamps: Object.fromEntries(Object.entries(stamps).sort(([x], [y]) => (x < y ? -1 : 1))) };
 }

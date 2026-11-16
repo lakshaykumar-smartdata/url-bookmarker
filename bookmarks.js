@@ -126,15 +126,17 @@ function render() {
   const { bookmarks, folders } = data;
   const q = $('q').value.trim().toLowerCase();
 
+  const focused = document.activeElement?.closest?.('nav [data-folder]')?.dataset.folder; // keep focus across redraws
   $('nav').replaceChildren(
     navButton(HOME, 'Home', null, 'home'),
     navButton(TODO, 'To-do', data.todos.filter(t => !t.done).length || null, 'todo'),
     navButton(NOTES, 'Notes', data.notes.length || null, 'note'),
     navButton(ALL, 'All bookmarks', bookmarks.length, 'all'),
-    el('div', { className: 'label', textContent: 'Folders' }),
-    ...folders.map(f => navButton(f, f, bookmarks.filter(b => folderOf(b) === f).length, 'folder'))
+    el('div', { className: 'label', textContent: 'Folders', title: 'Drag a folder to reorder, or Alt+Up / Alt+Down' }),
+    ...folders.map(folderButton)
   );
   $('nav').querySelector('.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  if (focused !== undefined) $('nav').querySelector(`[data-folder="${CSS.escape(focused)}"]`)?.focus();
 
   // Home tab: slideshow + clocks (home.js). A search always shows results instead.
   const homeMode = !q && selected === HOME;
@@ -522,3 +524,51 @@ $('deleteNote').onclick = async () => {
   await chrome.storage.local.set({ notes: data.notes.filter(x => x.id !== n.id) });
   toast('Note deleted', { label: 'Undo', run: () => { noteId = n.id; chrome.storage.local.set(before); } });
 };
+
+// ---------- Reorder folders: drag in the sidebar, or Alt+Up / Alt+Down on a folder ----------
+function moveFolder(name, to) {
+  const list = data.folders.filter(f => f !== name);
+  list.splice(Math.max(0, Math.min(to, list.length)), 0, name);
+  if (list.join('\n') === data.folders.join('\n')) return;
+  data.folders = list;
+  render();
+  chrome.storage.local.set({ folders: list });
+}
+const clearDrop = () => document.querySelectorAll('nav .drop-before, nav .drop-after')
+  .forEach(x => x.classList.remove('drop-before', 'drop-after'));
+
+function folderButton(f) {
+  const b = navButton(f, f, data.bookmarks.filter(x => folderOf(x) === f).length, 'folder');
+  b.draggable = true;
+  b.dataset.folder = f;
+  b.ondragstart = e => {
+    e.dataTransfer.setData('text/x-folder', f);
+    e.dataTransfer.effectAllowed = 'move';
+    b.classList.add('dragging');
+  };
+  b.ondragend = () => { b.classList.remove('dragging'); clearDrop(); };
+  b.ondragover = e => {
+    if (!e.dataTransfer.types.includes('text/x-folder')) return;
+    e.preventDefault();
+    const r = b.getBoundingClientRect();
+    const row = getComputedStyle($('nav')).display === 'flex'; // narrow window: folders are a horizontal strip
+    const after = row ? e.clientX > r.left + r.width / 2 : e.clientY > r.top + r.height / 2;
+    clearDrop();
+    b.classList.add(after ? 'drop-after' : 'drop-before');
+  };
+  b.ondragleave = () => b.classList.remove('drop-before', 'drop-after');
+  b.ondrop = e => {
+    e.preventDefault();
+    const from = e.dataTransfer.getData('text/x-folder');
+    const after = b.classList.contains('drop-after');
+    clearDrop();
+    if (!from || from === f) return;
+    moveFolder(from, data.folders.filter(x => x !== from).indexOf(f) + (after ? 1 : 0));
+  };
+  b.onkeydown = e => {
+    if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+    e.preventDefault();
+    moveFolder(f, data.folders.indexOf(f) + (e.key === 'ArrowUp' ? -1 : 1)); // render() keeps it focused
+  };
+  return b;
+}

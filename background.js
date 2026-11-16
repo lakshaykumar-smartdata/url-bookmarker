@@ -81,6 +81,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
     };
     diff(changes.bookmarks, bKey);
     diff(changes.folders, fKey);
+    const { oldValue: was = [], newValue: now_ = [] } = changes.folders || {};
+    if (was.length === now_.length && was.join('\n') !== now_.join('\n') && was.every(f => now_.includes(f))) {
+      syncStamps['o:folders'] = { t: now }; // same folders, new order: you dragged one
+    }
     diff(changes.todos, tKey);
     diff(changes.notes, nKey);
     await chrome.storage.local.set({ syncStamps });
