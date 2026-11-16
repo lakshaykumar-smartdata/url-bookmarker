@@ -5,6 +5,7 @@ const folderOf = b => b.folder || 'Unsorted';
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 const ALL = '\0all';
 const HOME = '\0home';
+const TODO = '\0todo';
 
 // Line icon from the <symbol> sprite in bookmarks.html.
 function svgIcon(name) {
@@ -50,13 +51,13 @@ fetch(chrome.runtime.getURL('manifest.json')).then(r => r.json()).then(async m =
 // Keep this tab pinned so it stays put and is hard to close by accident.
 chrome.tabs.getCurrent(t => t && !t.pinned && chrome.tabs.update(t.id, { pinned: true }));
 
-let data = { bookmarks: [], folders: [] };
+let data = { bookmarks: [], folders: [], todos: [] };
 let selected = HOME; // the page always opens on Home
 
 async function load() {
-  const { bookmarks = [], folders = [] } = await chrome.storage.local.get(['bookmarks', 'folders']);
-  data = { bookmarks, folders: [...new Set([...folders, ...bookmarks.map(folderOf)])] };
-  if (selected !== ALL && selected !== HOME && !data.folders.includes(selected)) selected = ALL;
+  const { bookmarks = [], folders = [], todos = [] } = await chrome.storage.local.get(['bookmarks', 'folders', 'todos']);
+  data = { bookmarks, folders: [...new Set([...folders, ...bookmarks.map(folderOf)])], todos };
+  if (![ALL, HOME, TODO].includes(selected) && !data.folders.includes(selected)) selected = ALL;
   render();
 }
 
@@ -124,6 +125,7 @@ function render() {
 
   $('nav').replaceChildren(
     navButton(HOME, 'Home', null, 'home'),
+    navButton(TODO, 'To-do', data.todos.filter(t => !t.done).length || null, 'todo'),
     navButton(ALL, 'All bookmarks', bookmarks.length, 'all'),
     el('div', { className: 'label', textContent: 'Folders' }),
     ...folders.map(f => navButton(f, f, bookmarks.filter(b => folderOf(b) === f).length, 'folder'))
@@ -136,7 +138,10 @@ function render() {
   $('wrap').hidden = homeMode;
   document.body.classList.toggle('home-mode', homeMode); // photo behind the whole page
   if (typeof setHomeVisible === 'function') setHomeVisible(homeMode);
+  const todoMode = !q && selected === TODO;
+  $('todo').hidden = !todoMode;
   if (homeMode) return;
+  if (todoMode) { $('wrap').hidden = true; return renderTodos(); }
 
   // Search always looks across every folder.
   let rows = bookmarks.map((b, i) => [b, i]);
@@ -242,7 +247,7 @@ $('file').onchange = async () => {
 };
 
 seedFromBundle().finally(load); // also here, in case the background import didn't run
-chrome.storage.onChanged.addListener(c => (c.bookmarks || c.folders) && load());
+chrome.storage.onChanged.addListener(c => (c.bookmarks || c.folders || c.todos) && load());
 
 // ---------- Sync (the work happens in background.js) ----------
 async function showSync() {
@@ -281,3 +286,36 @@ $('syncOff').onclick = async () => {
 chrome.storage.onChanged.addListener(c => (c.syncSettings || c.syncStatus) && showSync());
 document.addEventListener('visibilitychange', () => document.hidden || chrome.runtime.sendMessage({ sync: true }).catch(() => {}));
 showSync();
+
+// ---------- To-do (synced with the Gist like bookmarks) ----------
+const saveTodos = todos => chrome.storage.local.set({ todos }); // onChanged re-renders
+
+function renderTodos() {
+  const todos = [...data.todos].sort((a, b) => a.done - b.done); // open first, newest on top
+  const open = todos.filter(t => !t.done).length;
+  $('todoSub').textContent = `${open} open`;
+  $('todoClear').hidden = open === todos.length;
+  $('todoEmpty').hidden = !!todos.length;
+  $('todoList').replaceChildren(...todos.map(t => {
+    const li = el('li', { className: t.done ? 'done' : '' });
+    const box = el('input', { type: 'checkbox', checked: t.done, title: t.done ? 'Mark as not done' : 'Mark as done' });
+    box.onchange = () => saveTodos(data.todos.map(x => (x.id === t.id ? { ...x, done: box.checked } : x)));
+    const del = el('button', { className: 'icon-btn danger', title: 'Delete task' });
+    del.append(svgIcon('trash'));
+    del.onclick = () => saveTodos(data.todos.filter(x => x.id !== t.id));
+    li.append(box, el('span', { className: 'todo-text', textContent: t.text }), del);
+    return li;
+  }));
+}
+$('todoForm').onsubmit = e => {
+  e.preventDefault();
+  const text = $('todoInput').value.trim();
+  if (!text) return;
+  $('todoInput').value = '';
+  saveTodos([{ id: crypto.randomUUID(), text, done: false, at: new Date().toISOString() }, ...data.todos]);
+};
+$('todoClear').onclick = async () => {
+  const before = await chrome.storage.local.get('todos');
+  await saveTodos(data.todos.filter(t => !t.done));
+  toast('Finished tasks cleared', { label: 'Undo', run: () => chrome.storage.local.set(before) });
+};

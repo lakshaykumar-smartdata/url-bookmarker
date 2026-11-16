@@ -39,29 +39,38 @@ async function mergeBookmarks(data) {
 // so a delete in one browser deletes everywhere instead of coming back on the next merge.
 const bKey = b => `b:${b.url}\n${b.folder || 'Unsorted'}`;
 const fKey = f => `f:${f}`;
+const tKey = t => `t:${t.id}`; // to-do items
 
-// a = this browser, b = the Gist. Each is {bookmarks, folders, stamps}. Newest stamp wins;
-// items with no stamp (saved before sync existed) count as added at time 0.
+// a = this browser, b = the Gist. Each is {bookmarks, folders, todos, stamps}. Newest stamp wins,
+// for edits too (a to-do ticked in Edge shows ticked in Chrome).
+// Items with no stamp (saved before sync existed) count as added at time 0.
 function mergeSync(a, b) {
-  const stamps = { ...a.stamps };
-  for (const [k, s] of Object.entries(b.stamps || {})) if (!stamps[k] || s.t > stamps[k].t) stamps[k] = s;
+  const sa = a.stamps || {}, sb = b.stamps || {};
+  const stamps = { ...sa };
+  for (const [k, s] of Object.entries(sb)) if (!stamps[k] || s.t > stamps[k].t) stamps[k] = s;
   const alive = k => !stamps[k]?.del;
-  const pick = (mine, theirs, key) => {
-    const own = mine.filter(x => alive(key(x)));
+  const pick = (mine = [], theirs = [], key) => {
+    const other = new Map(theirs.map(x => [key(x), x]));
+    const newer = k => other.has(k) && (sb[k]?.t ?? 0) > (sa[k]?.t ?? 0);
+    const own = mine.filter(x => alive(key(x))).map(x => (newer(key(x)) ? other.get(key(x)) : x));
     const have = new Set(own.map(key));
     const fresh = theirs.filter(x => alive(key(x)) && !have.has(key(x)) && have.add(key(x)));
     return [own, fresh];
   };
-  const [ownB, freshB] = pick(a.bookmarks, b.bookmarks || [], bKey);
-  const [ownF, freshF] = pick(a.folders, b.folders || [], fKey);
+  const [ownB, freshB] = pick(a.bookmarks, b.bookmarks, bKey);
+  const [ownF, freshF] = pick(a.folders, b.folders, fKey);
+  const [ownT, freshT] = pick(a.todos, b.todos, tKey);
   const bookmarks = [...freshB, ...ownB]; // links from the other browser go on top, like a new save
   const folders = [...ownF, ...freshF];
   for (const x of bookmarks) if (!folders.includes(x.folder || 'Unsorted')) folders.push(x.folder || 'Unsorted');
-  return { bookmarks, folders, stamps: Object.fromEntries(Object.entries(stamps).sort(([x], [y]) => (x < y ? -1 : 1))) };
+  return { bookmarks, folders, todos: [...freshT, ...ownT], stamps: Object.fromEntries(Object.entries(stamps).sort(([x], [y]) => (x < y ? -1 : 1))) };
 }
 
 // Order-free fingerprint, so two browsers with the same links in a different order don't keep re-uploading.
-const syncFingerprint = s => JSON.stringify([s.bookmarks.map(bKey).sort(), [...s.folders].sort(), s.stamps]);
+const syncFingerprint = s => JSON.stringify([
+  s.bookmarks.map(bKey).sort(), [...s.folders].sort(), s.stamps,
+  (s.todos || []).map(t => JSON.stringify([t.id, t.text, t.done])).sort(),
+]);
 
 // Merge the bundled bookmarks.json into storage. Skipped if the file hasn't changed
 // since the last import, so links you deleted don't come back.

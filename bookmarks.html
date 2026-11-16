@@ -288,6 +288,23 @@
     .home-settings select:focus, .home-settings input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
     .home-settings .note { margin: 0; font-size: 12px; color: var(--danger); }
     .home-settings .note:empty { display: none; }
+    .todo-add { position: relative; display: flex; align-items: center; margin-bottom: 12px; }
+    .todo-add .i { position: absolute; z-index: 1; left: 14px; color: var(--muted); pointer-events: none; }
+    .todo-add input {
+      width: 100%; height: 46px; padding: 0 14px 0 40px; font: inherit; font-size: 14px; color: var(--text);
+      border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); outline: none;
+      backdrop-filter: blur(16px);
+    }
+    .todo-add input::placeholder { color: var(--faint); }
+    .todo-add input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+    .todo-list { grid-template-columns: 1fr; gap: 6px; }
+    .todo-list li { grid-template-columns: auto minmax(0, 1fr) auto; padding: 8px 8px 8px 14px; }
+    .todo-list li:hover { transform: none; }
+    .todo-list input[type=checkbox] { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+    .todo-text { font-size: 14px; overflow-wrap: anywhere; }
+    .todo-list li.done .todo-text { color: var(--faint); text-decoration: line-through; }
+    .todo-list .icon-btn { opacity: 0; transition: opacity .12s; }
+    .todo-list li:hover .icon-btn, .todo-list .icon-btn:focus-visible { opacity: 1; }
     .sync-panel { position: fixed; top: 70px; right: 20px; bottom: auto; z-index: 30; width: 320px; }
     .home-settings .hint { margin: 0; font-size: 12px; color: var(--muted); }
     .home-settings .link { color: var(--accent); text-decoration: none; }
@@ -316,6 +333,7 @@
       .chip { display: none; }
       .folder-actions .btn span { display: none; }
       li { grid-template-columns: 34px minmax(0, 1fr) auto; }
+      .todo-list .icon-btn { opacity: 1; }
       .row-actions { opacity: 1; position: static; padding: 0; background: none !important; }
     }
   </style>
@@ -337,6 +355,8 @@
     <symbol id="i-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
     <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4"/></symbol>
     <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M21.17 6.81a1 1 0 0 0-3.98-3.98L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z"/><path d="m15 5 4 4"/></symbol>
+    <symbol id="i-todo" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></symbol>
     <symbol id="i-sync" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></symbol>
     <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z"/></symbol>
   </svg>
@@ -417,6 +437,25 @@
           <p class="note" id="homeNote"></p>
           <button class="btn small primary-btn" type="submit">Save</button>
         </form>
+      </section>
+      <section class="wrap todo" id="todo" hidden>
+        <div class="heading">
+          <h2>To-do</h2>
+          <span class="pill" id="todoSub"></span>
+          <div class="folder-actions">
+            <button class="btn small" id="todoClear" title="Remove finished tasks"><svg class="i"><use href="#i-trash"/></svg><span>Clear done</span></button>
+          </div>
+        </div>
+        <form class="todo-add" id="todoForm">
+          <svg class="i"><use href="#i-plus"/></svg>
+          <input id="todoInput" placeholder="Add a task and press Enter" aria-label="New task" autocomplete="off" maxlength="300">
+        </form>
+        <ul class="todo-list" id="todoList"></ul>
+        <div id="todoEmpty" class="empty" hidden>
+          <div class="circle"><svg class="i"><use href="#i-todo"/></svg></div>
+          <strong>Nothing to do</strong>
+          <span>Tasks you add here sync to your other browsers too.</span>
+        </div>
       </section>
       <div class="wrap" id="wrap">
         <div class="heading">
