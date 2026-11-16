@@ -269,7 +269,9 @@
     }
     .credit { color: rgb(255 255 255 / 80%); font-size: 12px; text-decoration: none; text-shadow: 0 1px 6px rgb(0 0 0 / 50%); }
     .credit:hover { color: #fff; text-decoration: underline; }
-    .home-tools { display: flex; gap: 6px; }
+    .home-tools { display: flex; align-items: center; gap: 6px; }
+    .dev-credit { margin-right: 8px; color: rgb(255 255 255 / 80%); font-size: 12px; white-space: nowrap; text-shadow: 0 1px 6px rgb(0 0 0 / 50%); }
+    @media (max-width: 480px) { .dev-credit { display: none; } } /* phones: no room beside the photo credit */
     .glass-btn {
       width: 34px; height: 34px; display: grid; place-items: center; color: #fff;
       border: 1px solid rgb(255 255 255 / 22%); border-radius: 9px; background: rgb(20 24 32 / 30%); backdrop-filter: blur(10px);
@@ -410,6 +412,7 @@
         <div class="home-bar">
           <a class="credit" id="credit" target="_blank" rel="noopener"></a>
           <div class="home-tools">
+            <span class="dev-credit">Developed by Lakshay</span>
             <button class="glass-btn" id="homePrev" title="Previous photo"><svg class="i"><use href="#i-left"/></svg></button>
             <button class="glass-btn" id="homePause" title="Pause slideshow" aria-pressed="false"><svg class="i"><use href="#i-pause"/></svg></button>
             <button class="glass-btn" id="homeNext" title="Next photo"><svg class="i"><use href="#i-right"/></svg></button>
