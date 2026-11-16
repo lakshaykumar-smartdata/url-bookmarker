@@ -6,6 +6,7 @@ const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 const ALL = '\0all';
 const HOME = '\0home';
 const TODO = '\0todo';
+const NOTES = '\0notes';
 
 // Line icon from the <symbol> sprite in bookmarks.html.
 function svgIcon(name) {
@@ -51,13 +52,13 @@ fetch(chrome.runtime.getURL('manifest.json')).then(r => r.json()).then(async m =
 // Keep this tab pinned so it stays put and is hard to close by accident.
 chrome.tabs.getCurrent(t => t && !t.pinned && chrome.tabs.update(t.id, { pinned: true }));
 
-let data = { bookmarks: [], folders: [], todos: [] };
+let data = { bookmarks: [], folders: [], todos: [], notes: [] };
 let selected = HOME; // the page always opens on Home
 
 async function load() {
-  const { bookmarks = [], folders = [], todos = [] } = await chrome.storage.local.get(['bookmarks', 'folders', 'todos']);
-  data = { bookmarks, folders: [...new Set([...folders, ...bookmarks.map(folderOf)])], todos };
-  if (![ALL, HOME, TODO].includes(selected) && !data.folders.includes(selected)) selected = ALL;
+  const { bookmarks = [], folders = [], todos = [], notes = [] } = await chrome.storage.local.get(['bookmarks', 'folders', 'todos', 'notes']);
+  data = { bookmarks, folders: [...new Set([...folders, ...bookmarks.map(folderOf)])], todos, notes };
+  if (![ALL, HOME, TODO, NOTES].includes(selected) && !data.folders.includes(selected)) selected = ALL;
   render();
 }
 
@@ -126,6 +127,7 @@ function render() {
   $('nav').replaceChildren(
     navButton(HOME, 'Home', null, 'home'),
     navButton(TODO, 'To-do', data.todos.filter(t => !t.done).length || null, 'todo'),
+    navButton(NOTES, 'Notes', data.notes.length || null, 'note'),
     navButton(ALL, 'All bookmarks', bookmarks.length, 'all'),
     el('div', { className: 'label', textContent: 'Folders' }),
     ...folders.map(f => navButton(f, f, bookmarks.filter(b => folderOf(b) === f).length, 'folder'))
@@ -140,8 +142,11 @@ function render() {
   if (typeof setHomeVisible === 'function') setHomeVisible(homeMode);
   const todoMode = !q && selected === TODO;
   $('todo').hidden = !todoMode;
+  const notesMode = !q && selected === NOTES;
+  $('notes').hidden = !notesMode;
   if (homeMode) return;
   if (todoMode) { $('wrap').hidden = true; return renderTodos(); }
+  if (notesMode) { $('wrap').hidden = true; return renderNotes(); }
 
   // Search always looks across every folder.
   let rows = bookmarks.map((b, i) => [b, i]);
@@ -247,7 +252,7 @@ $('file').onchange = async () => {
 };
 
 seedFromBundle().finally(load); // also here, in case the background import didn't run
-chrome.storage.onChanged.addListener(c => (c.bookmarks || c.folders || c.todos) && load());
+chrome.storage.onChanged.addListener(c => (c.bookmarks || c.folders || c.todos || c.notes) && load());
 
 // ---------- Sync (the work happens in background.js) ----------
 async function showSync() {
@@ -318,4 +323,83 @@ $('todoClear').onclick = async () => {
   const before = await chrome.storage.local.get('todos');
   await saveTodos(data.todos.filter(t => !t.done));
   toast('Finished tasks cleared', { label: 'Undo', run: () => chrome.storage.local.set(before) });
+};
+
+// ---------- Notes (synced with the Gist like bookmarks) ----------
+let noteId = null; // the open note
+let noteTimer;
+const when = iso => {
+  const d = new Date(iso);
+  return d.toDateString() === new Date().toDateString()
+    ? d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    : d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
+function renderNotes() {
+  const notes = [...data.notes].sort((a, b) => b.updated.localeCompare(a.updated)); // last edited on top
+  if (!notes.some(n => n.id === noteId)) noteId = notes[0]?.id ?? null;
+  $('notesSub').textContent = plural(notes.length, 'note');
+  $('notesEmpty').hidden = !!notes.length;
+  $('notesBody').hidden = !notes.length;
+  $('noteList').replaceChildren(...notes.map(n => {
+    const b = el('button', { className: `note-item${n.id === noteId ? ' active' : ''}` });
+    b.append(
+      el('strong', { textContent: n.title.trim() || 'Untitled' }),
+      el('span', { textContent: n.body.trim().slice(0, 90) || 'No text' }),
+      el('small', { textContent: when(n.updated) })
+    );
+    b.onclick = () => { flushNote(); noteId = n.id; renderNotes(); };
+    return b;
+  }));
+  const n = notes.find(x => x.id === noteId);
+  if (!n) return;
+  // Don't overwrite what you're typing: only refill for another note, or when the editor isn't focused.
+  const ed = $('noteEditor');
+  if (ed.dataset.id !== n.id || !ed.contains(document.activeElement)) {
+    ed.dataset.id = n.id;
+    $('noteTitle').value = n.title;
+    $('noteText').value = n.body;
+    $('noteSaved').textContent = `Edited ${when(n.updated)}`;
+  }
+}
+
+// Saves 0.6 s after you stop typing, and when you leave the note.
+function flushNote() {
+  clearTimeout(noteTimer);
+  const id = $('noteEditor').dataset.id;
+  const n = data.notes.find(x => x.id === id);
+  if (!n) return;
+  const title = $('noteTitle').value, body = $('noteText').value;
+  if (n.title === title && n.body === body) return;
+  data.notes = data.notes.map(x => (x.id === id ? { ...x, title, body, updated: new Date().toISOString() } : x));
+  $('noteSaved').textContent = 'Saved';
+  chrome.storage.local.set({ notes: data.notes });
+}
+$('noteTitle').oninput = $('noteText').oninput = () => {
+  $('noteSaved').textContent = 'Saving…';
+  clearTimeout(noteTimer);
+  noteTimer = setTimeout(flushNote, 600);
+};
+$('noteEditor').addEventListener('focusout', flushNote);
+$('noteTitle').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); $('noteText').focus(); } };
+window.addEventListener('beforeunload', flushNote);
+
+const newNote = () => {
+  flushNote();
+  const n = { id: crypto.randomUUID(), title: '', body: '', updated: new Date().toISOString() };
+  data.notes = [n, ...data.notes];
+  noteId = n.id;
+  renderNotes();
+  $('noteTitle').focus();
+  chrome.storage.local.set({ notes: data.notes });
+};
+$('newNote').onclick = $('newNoteEmpty').onclick = newNote;
+
+$('deleteNote').onclick = async () => {
+  const n = data.notes.find(x => x.id === noteId);
+  if (!n || !confirm(`Delete "${n.title.trim() || 'Untitled'}"?`)) return;
+  clearTimeout(noteTimer);
+  const before = await chrome.storage.local.get('notes');
+  await chrome.storage.local.set({ notes: data.notes.filter(x => x.id !== n.id) });
+  toast('Note deleted', { label: 'Undo', run: () => { noteId = n.id; chrome.storage.local.set(before); } });
 };

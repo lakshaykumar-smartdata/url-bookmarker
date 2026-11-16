@@ -68,7 +68,7 @@ const queue = fn => (chain = chain.then(fn).catch(console.error));
 
 // Stamp every add/remove. A write that includes syncStamps came from sync itself: skip it.
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== 'local' || changes.syncStamps || (!changes.bookmarks && !changes.folders && !changes.todos)) return;
+  if (area !== 'local' || changes.syncStamps || (!changes.bookmarks && !changes.folders && !changes.todos && !changes.notes)) return;
   queue(async () => {
     const now = Date.now();
     const { syncStamps = {} } = await chrome.storage.local.get('syncStamps');
@@ -82,6 +82,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
     diff(changes.bookmarks, bKey);
     diff(changes.folders, fKey);
     diff(changes.todos, tKey);
+    diff(changes.notes, nKey);
     await chrome.storage.local.set({ syncStamps });
   });
   clearTimeout(syncTimer);
@@ -105,7 +106,7 @@ async function sync() {
     return r.json();
   };
   try {
-    let gistId = s.gistId, remote = { bookmarks: [], folders: [], todos: [], stamps: {} };
+    let gistId = s.gistId, remote = { bookmarks: [], folders: [], todos: [], notes: [], stamps: {} };
     // Second browser: find the Gist the first one made, so only the token has to be pasted.
     if (!gistId) gistId = (await gh('/gists?per_page=100')).find(g => g.files[GIST_FILE])?.id;
     if (gistId) {
@@ -117,12 +118,12 @@ async function sync() {
         gistId = null; // Gist was deleted: make a new one
       }
     }
-    const local = await chrome.storage.local.get(['bookmarks', 'folders', 'todos', 'syncStamps']);
-    const mine = { bookmarks: local.bookmarks || [], folders: local.folders || [], todos: local.todos || [], stamps: local.syncStamps || {} };
+    const local = await chrome.storage.local.get(['bookmarks', 'folders', 'todos', 'notes', 'syncStamps']);
+    const mine = { bookmarks: local.bookmarks || [], folders: local.folders || [], todos: local.todos || [], notes: local.notes || [], stamps: local.syncStamps || {} };
     const merged = mergeSync(mine, remote);
     // ponytail: an edit landing between this read and the write below (a few ms) is lost locally; its stamp survives.
     if (syncFingerprint(merged) !== syncFingerprint(mine)) {
-      await chrome.storage.local.set({ bookmarks: merged.bookmarks, folders: merged.folders, todos: merged.todos, syncStamps: merged.stamps });
+      await chrome.storage.local.set({ bookmarks: merged.bookmarks, folders: merged.folders, todos: merged.todos, notes: merged.notes, syncStamps: merged.stamps });
     }
     const content = JSON.stringify(merged);
     if (!gistId) {

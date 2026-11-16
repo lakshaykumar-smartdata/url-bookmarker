@@ -40,8 +40,9 @@ async function mergeBookmarks(data) {
 const bKey = b => `b:${b.url}\n${b.folder || 'Unsorted'}`;
 const fKey = f => `f:${f}`;
 const tKey = t => `t:${t.id}`; // to-do items
+const nKey = n => `n:${n.id}`; // notes
 
-// a = this browser, b = the Gist. Each is {bookmarks, folders, todos, stamps}. Newest stamp wins,
+// a = this browser, b = the Gist. Each is {bookmarks, folders, todos, notes, stamps}. Newest stamp wins,
 // for edits too (a to-do ticked in Edge shows ticked in Chrome).
 // Items with no stamp (saved before sync existed) count as added at time 0.
 function mergeSync(a, b) {
@@ -60,16 +61,19 @@ function mergeSync(a, b) {
   const [ownB, freshB] = pick(a.bookmarks, b.bookmarks, bKey);
   const [ownF, freshF] = pick(a.folders, b.folders, fKey);
   const [ownT, freshT] = pick(a.todos, b.todos, tKey);
+  // ponytail: a note edited in both browsers before they sync keeps only the newer edit; merge text if that bites.
+  const [ownN, freshN] = pick(a.notes, b.notes, nKey);
   const bookmarks = [...freshB, ...ownB]; // links from the other browser go on top, like a new save
   const folders = [...ownF, ...freshF];
   for (const x of bookmarks) if (!folders.includes(x.folder || 'Unsorted')) folders.push(x.folder || 'Unsorted');
-  return { bookmarks, folders, todos: [...freshT, ...ownT], stamps: Object.fromEntries(Object.entries(stamps).sort(([x], [y]) => (x < y ? -1 : 1))) };
+  return { bookmarks, folders, todos: [...freshT, ...ownT], notes: [...freshN, ...ownN], stamps: Object.fromEntries(Object.entries(stamps).sort(([x], [y]) => (x < y ? -1 : 1))) };
 }
 
 // Order-free fingerprint, so two browsers with the same links in a different order don't keep re-uploading.
 const syncFingerprint = s => JSON.stringify([
   s.bookmarks.map(bKey).sort(), [...s.folders].sort(), s.stamps,
   (s.todos || []).map(t => JSON.stringify([t.id, t.text, t.done])).sort(),
+  (s.notes || []).map(n => JSON.stringify([n.id, n.title, n.body])).sort(),
 ]);
 
 // Merge the bundled bookmarks.json into storage. Skipped if the file hasn't changed
