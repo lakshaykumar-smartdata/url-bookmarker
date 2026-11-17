@@ -99,9 +99,20 @@ chrome.storage.onChanged.addListener((changes, area) => {
 });
 let syncTimer;
 
+// The token also goes into the browser's own profile sync (chrome.storage.sync), so a new PC
+// signed in to the same Google (Chrome) or Microsoft (Edge) account picks it up by itself.
+// Only works where this extension has the same ID, see README.
+// "Turn off" only turns it off on this PC (syncDisabled); other PCs keep syncing.
 async function sync() {
-  const { syncSettings: s, syncStatus = {} } = await chrome.storage.local.get(['syncSettings', 'syncStatus']);
-  if (!s?.token) return;
+  let { syncSettings: s, syncStatus = {}, syncDisabled } = await chrome.storage.local.get(['syncSettings', 'syncStatus', 'syncDisabled']);
+  const { ghToken } = await chrome.storage.sync.get('ghToken').catch(() => ({}));
+  if (!s?.token) {
+    if (!ghToken || syncDisabled) return;
+    s = { token: ghToken };
+    await chrome.storage.local.set({ syncSettings: s }); // new PC: sync turns itself on
+  } else if (ghToken !== s.token) {
+    chrome.storage.sync.set({ ghToken: s.token }).catch(console.error);
+  }
   const gh = async (path, method = 'GET', body) => {
     const r = await fetch('https://api.github.com' + path, {
       method,

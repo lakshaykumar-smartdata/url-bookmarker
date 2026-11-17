@@ -285,13 +285,14 @@ $('syncPanel').onsubmit = async e => {
   if (!token) return ($('syncNote').textContent = 'Paste a GitHub token first.');
   const { syncSettings } = await chrome.storage.local.get('syncSettings');
   const gistId = syncSettings?.token === token ? syncSettings.gistId : undefined; // new token: find the Gist again
-  await chrome.storage.local.set({ syncSettings: { token, gistId }, syncStatus: {} });
+  await chrome.storage.local.set({ syncSettings: { token, gistId }, syncStatus: {}, syncDisabled: false });
   chrome.runtime.sendMessage({ sync: true }).catch(() => {});
 };
 $('syncOff').onclick = async () => {
   await chrome.storage.local.remove(['syncSettings', 'syncStatus']);
+  await chrome.storage.local.set({ syncDisabled: true }); // don't pick the token up again from browser sync
   $('syncToken').value = '';
-  toast('Sync turned off. Your links stay here.');
+  toast('Sync turned off on this PC. Your links stay here.');
 };
 chrome.storage.onChanged.addListener(c => (c.syncSettings || c.syncStatus) && showSync());
 document.addEventListener('visibilitychange', () => document.hidden || chrome.runtime.sendMessage({ sync: true }).catch(() => {}));
