@@ -69,12 +69,11 @@ $('form').onsubmit = async e => {
 
 // Bring the pinned bookmarks tab into this window and switch to it (no second copy).
 $('open').onclick = async () => {
-  const page = chrome.runtime.getURL('bookmarks.html');
-  const [ctx] = await chrome.runtime.getContexts({ contextTypes: ['TAB'], documentUrls: [page] });
-  if (!ctx) return chrome.tabs.create({ url: page, pinned: true });
+  const t = await findPinnedPage();
+  if (!t) return chrome.tabs.create({ url: chrome.runtime.getURL(PINNED_PAGE), pinned: true });
   const here = await chrome.windows.getCurrent();
-  if (ctx.windowId !== here.id) await chrome.tabs.move(ctx.tabId, { windowId: here.id, index: 0 });
-  await chrome.tabs.update(ctx.tabId, { active: true, pinned: true });
+  if (t.windowId !== here.id) await chrome.tabs.move(t.id, { windowId: here.id, index: 0 });
+  await chrome.tabs.update(t.id, { active: true, pinned: true });
   window.close();
 };
 $('export').onclick = exportJson;

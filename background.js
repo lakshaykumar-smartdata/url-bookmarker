@@ -25,14 +25,13 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
 // 2) The bookmarks page always stays open as a pinned tab.
 //    Chrome doesn't let extensions block closing a tab, so if it's closed we open it again.
-const PAGE = chrome.runtime.getURL('bookmarks.html');
+const PAGE = chrome.runtime.getURL(PINNED_PAGE);
 
 let pending; // startup fires several events at once; only open one tab
 // windowId: where to open it if it's missing. Default: the window you used last.
 function ensurePage(windowId) {
   pending ??= (async () => {
-    const [ctx] = await chrome.runtime.getContexts({ contextTypes: ['TAB'], documentUrls: [PAGE] });
-    if (ctx) return chrome.tabs.update(ctx.tabId, { pinned: true });
+    if (await findPinnedPage()) return;
     if (windowId === undefined) {
       windowId = (await chrome.windows.getLastFocused({ windowTypes: ['normal'] }).catch(() => null))?.id;
     }

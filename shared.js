@@ -34,6 +34,17 @@ async function mergeBookmarks(data) {
   return added;
 }
 
+// The pinned bookmarks tab, if open. New tabs show the same page but aren't pinned, so look
+// for the pinned one.
+const PINNED_PAGE = 'bookmarks.html#pinned';
+async function findPinnedPage() {
+  for (const c of await chrome.runtime.getContexts({ contextTypes: ['TAB'] })) {
+    const t = await chrome.tabs.get(c.tabId).catch(() => null);
+    if (t?.pinned) return t;
+  }
+  return null;
+}
+
 // ---------- Folder suggestion for the popup ----------
 // 1. A folder whose name shows up in the page's URL or title ("EligibilityOS" in
 //    github.com/sdeitech/EligibilityOS-Frontend). Longest match wins.

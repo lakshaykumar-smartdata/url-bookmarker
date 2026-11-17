@@ -49,8 +49,9 @@ fetch(chrome.runtime.getURL('manifest.json')).then(r => r.json()).then(async m =
   chrome.runtime.reload(); // background reopens this page as a pinned tab afterwards
 }).catch(() => {});
 
-// Keep this tab pinned so it stays put and is hard to close by accident.
-chrome.tabs.getCurrent(t => t && !t.pinned && chrome.tabs.update(t.id, { pinned: true }));
+// Keep the main copy (opened as bookmarks.html#pinned) pinned so it stays put and is hard to
+// close by accident. The same page also shows in every new tab; those stay normal tabs.
+if (location.hash === '#pinned') chrome.tabs.getCurrent(t => t && !t.pinned && chrome.tabs.update(t.id, { pinned: true }));
 
 let data = { bookmarks: [], folders: [], todos: [], notes: [] };
 let draft = null; // unsaved new note, see Notes below
