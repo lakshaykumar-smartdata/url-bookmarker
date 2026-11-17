@@ -52,6 +52,19 @@ fetch(chrome.runtime.getURL('manifest.json')).then(r => r.json()).then(async m =
 // Keep the main copy (opened as bookmarks.html#pinned) pinned so it stays put and is hard to
 // close by accident. The same page also shows in every new tab; those stay normal tabs.
 if (location.hash === '#pinned') chrome.tabs.getCurrent(t => t && !t.pinned && chrome.tabs.update(t.id, { pinned: true }));
+else (async () => {
+  // New tab: jump to the pinned tab (bringing it into this window) and close this one.
+  // No pinned tab open: this new tab becomes the pinned one.
+  const me = await chrome.tabs.getCurrent();
+  if (!me) return;
+  // At browser start the background may be opening the pinned tab right now: give it a moment.
+  const pinned = await findPinnedPage() || await new Promise(r => setTimeout(r, 1500)).then(findPinnedPage);
+  if (!pinned) return chrome.tabs.update(me.id, { pinned: true });
+  if (pinned.id === me.id) return;
+  if (pinned.windowId !== me.windowId) await chrome.tabs.move(pinned.id, { windowId: me.windowId, index: 0 });
+  await chrome.tabs.update(pinned.id, { active: true, pinned: true });
+  chrome.tabs.remove(me.id);
+})().catch(console.error);
 
 let data = { bookmarks: [], folders: [], todos: [], notes: [] };
 let draft = null; // unsaved new note, see Notes below
