@@ -204,9 +204,56 @@ function renderZoneEditor() {
     del.append(svgIcon('trash'));
     del.onclick = () => { saveZones(zones().filter((_, j) => j !== i)); renderZoneEditor(); };
     const li = el('li');
-    li.append(label, el('span', { className: 'tz', textContent: zoneInfo(z.tz).abbr }), del);
+    // Drag by the handle (dragging the whole row would fight with selecting text in the label),
+    // or focus the handle and press Alt+Up / Alt+Down.
+    const grip = el('span', { className: 'grip', draggable: true, tabIndex: 0, title: 'Drag to reorder, or Alt+Up / Alt+Down' });
+    grip.setAttribute('aria-label', `Move ${z.label}`);
+    grip.append(svgIcon('grip'));
+    grip.ondragstart = e => {
+      e.dataTransfer.setData('text/x-zone', String(i));
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setDragImage(li, 10, li.offsetHeight / 2);
+      li.classList.add('dragging');
+    };
+    grip.ondragend = () => { li.classList.remove('dragging'); clearZoneDrop(); };
+    grip.onkeydown = e => {
+      if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+      e.preventDefault();
+      const to = i + (e.key === 'ArrowUp' ? -1 : 1);
+      if (to < 0 || to >= zones().length) return;
+      moveZone(i, to);
+      $('hsZones').children[to].querySelector('.grip').focus();
+    };
+    li.ondragover = e => {
+      if (!e.dataTransfer.types.includes('text/x-zone')) return;
+      e.preventDefault();
+      const r = li.getBoundingClientRect();
+      clearZoneDrop();
+      li.classList.add(e.clientY > r.top + r.height / 2 ? 'drop-after' : 'drop-before');
+    };
+    li.ondragleave = () => li.classList.remove('drop-before', 'drop-after');
+    li.ondrop = e => {
+      e.preventDefault();
+      const from = Number(e.dataTransfer.getData('text/x-zone'));
+      const after = li.classList.contains('drop-after');
+      clearZoneDrop();
+      if (from === i) return;
+      // Index in the list once the dragged clock is taken out.
+      moveZone(from, i - (from < i ? 1 : 0) + (after ? 1 : 0));
+    };
+    li.append(grip, label, el('span', { className: 'tz', textContent: zoneInfo(z.tz).abbr }), del);
     return li;
   }));
+}
+const clearZoneDrop = () => document.querySelectorAll('#hsZones .drop-before, #hsZones .drop-after')
+  .forEach(x => x.classList.remove('drop-before', 'drop-after'));
+function moveZone(from, to) {
+  const list = [...zones()];
+  const [z] = list.splice(from, 1);
+  list.splice(to, 0, z);
+  if (list.every((x, j) => x === zones()[j])) return;
+  saveZones(list);
+  renderZoneEditor();
 }
 const allZones = Intl.supportedValuesOf('timeZone');
 $('tzList').replaceChildren(...allZones.map(tz => el('option', { value: tz })));

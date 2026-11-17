@@ -297,6 +297,11 @@
     #hsZones { display: grid; grid-template-columns: none; gap: 6px; margin: 0; padding: 0; list-style: none; }
     #hsZones li { display: flex; gap: 6px; align-items: center; padding: 0; border: 0; background: none; box-shadow: none; backdrop-filter: none; }
     .hs-zones li input { flex: 1; min-width: 0; }
+    .hs-zones .grip { flex: none; display: grid; place-items: center; width: 18px; height: 34px; color: var(--faint); cursor: grab; border-radius: 6px; }
+    .hs-zones .grip:hover, .hs-zones .grip:focus-visible { color: var(--text); outline: none; background: rgb(127 127 127 / 15%); }
+    #hsZones li.dragging { opacity: .4; }
+    #hsZones li.drop-before { box-shadow: 0 -2px 0 var(--accent); }
+    #hsZones li.drop-after { box-shadow: 0 2px 0 var(--accent); }
     .hs-zones .tz { font-size: 11px; color: var(--faint); white-space: nowrap; }
     .hs-add { display: flex; gap: 6px; }
     .hs-add input { flex: 1; min-width: 0; }
@@ -429,6 +434,7 @@
     <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></symbol>
     <symbol id="i-copy" viewBox="0 0 24 24"><rect width="13" height="13" x="9" y="9" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
     <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-grip" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="18" r="1"/></symbol>
     <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
     <symbol id="i-home" viewBox="0 0 24 24"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
     <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></symbol>
@@ -510,7 +516,7 @@
             <input id="hsName" autocomplete="off" maxlength="40" placeholder="e.g. Lakshay">
           </label>
           <div class="hs-zones">
-            <span class="hs-title">World clocks <span class="opt">rename or remove, changes apply at once</span></span>
+            <span class="hs-title">World clocks <span class="opt">drag to reorder, rename or remove; changes apply at once</span></span>
             <ul id="hsZones"></ul>
             <div class="hs-add">
               <input id="hsZoneTz" list="tzList" autocomplete="off" placeholder="Add a city, e.g. London" aria-label="Add a time zone">
