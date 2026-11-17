@@ -59,6 +59,14 @@ function zoneInfo(tz) {
   };
 }
 
+// Browsers never show extensions the Windows user name; the closest is the account the
+// browser profile is signed in with. "lakshay.kumar@x.com" -> "Lakshay". Not signed in: no name.
+let who = '';
+chrome.identity?.getProfileUserInfo({ accountStatus: 'ANY' }, u => {
+  const first = (u?.email || '').split('@')[0].split(/[._\-+\d]+/).find(Boolean) || '';
+  who = first && first[0].toUpperCase() + first.slice(1).toLowerCase();
+});
+
 function tick() {
   const now = new Date();
   const [hm, ampm] = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).split(' ');
@@ -66,7 +74,7 @@ function tick() {
   $('bigAmpm').textContent = ampm || '';
   $('bigDate').textContent = now.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' });
   const hr = now.getHours();
-  $('greet').textContent = hr < 5 ? 'Good night' : hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening';
+  $('greet').textContent = (hr < 5 ? 'Good night' : hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening') + (who ? `, ${who}` : '');
 
   $('zones').replaceChildren(...ZONES.map(z => {
     const info = zoneInfo(z.tz);
