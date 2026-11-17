@@ -266,7 +266,12 @@
     .web-search input::placeholder { color: rgb(255 255 255 / 70%); }
     .web-search input:hover { background: rgb(20 24 32 / 42%); }
     .web-search input:focus { background: rgb(20 24 32 / 55%); border-color: rgb(255 255 255 / 55%); }
-    .web-search input::-webkit-search-cancel-button { filter: invert(1); }
+    /* The browser's own clear (x) button is black and ignores filters: draw a white one. */
+    .web-search input::-webkit-search-cancel-button {
+      -webkit-appearance: none; appearance: none; width: 16px; height: 16px; cursor: pointer; opacity: .8;
+      background: #fff; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M18 6 6 18M6 6l12 12'/%3E%3C/svg%3E") center / contain no-repeat;
+    }
+    .web-search input::-webkit-search-cancel-button:hover { opacity: 1; }
     .zones { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 28px; }
     .zone {
       width: 190px; padding: 14px 16px; text-align: left; text-shadow: none;
