@@ -157,6 +157,9 @@ $('homePause').onclick = async () => {
 };
 
 // ---------- Settings panel ----------
+// Google search: the form opens results in a new tab; clear the box afterwards.
+document.querySelector('.web-search').addEventListener('submit', e => setTimeout(() => e.target.reset()));
+
 $('homePrev').onclick = () => showPhoto(home.index - 1);
 $('homeNext').onclick = () => showPhoto(home.index + 1);
 $('homeSettingsBtn').onclick = () => {

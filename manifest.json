@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtV/qTYk0WY8BO7NZUInwi+ZmTFnRzFK1K712r3Gxu/1jortdYBQF9IPAP6mZmFuxqWnvohBQpb4ObPf7Tj0MlQUcAf97OB2QUfYdOh2hd9rAy3xsPOauqv9i2jfFuOuGEPGUxO/tgRVjw8sPU1v4lTqSQqi2NovkecfsxLLxog3s44m42AgwmNJmSLFt8EI7yV2vL0Cqe7t6qh67Z0T8h98VHORR6NQt8zpl0/ZlrvEbglv44y/fEM1X4u/n1N6WoD5KrsGdCME47B/+fQXmzcK9bpw8S4M/fc6Jqno4xCGaHB659DfMs680iEDhCJe2aawi14LFbpIvnbJy9ln3/wIDAQAB",
   "name": "URL Bookmarker",
-  "version": "1.26",
+  "version": "1.27",
   "description": "Save the current tab's URL into folders. Backs up to a JSON file.",
   "permissions": ["activeTab", "storage", "favicon", "downloads", "downloads.ui", "alarms", "contextMenus"],
   "icons": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },

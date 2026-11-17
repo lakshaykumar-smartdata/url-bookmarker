@@ -256,7 +256,18 @@
     .big-time { font-size: clamp(64px, 11vw, 132px); font-weight: 300; line-height: 1; letter-spacing: -.03em; margin: 6px 0 8px; font-variant-numeric: tabular-nums; }
     .big-time span { font-size: .28em; font-weight: 500; letter-spacing: 0; margin-left: 6px; opacity: .85; vertical-align: .9em; }
     .big-date { font-size: 17px; opacity: .9; }
-    .zones { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 36px; }
+    .web-search { position: relative; display: flex; align-items: center; width: min(560px, 100%); margin-top: 28px; text-shadow: none; }
+    .web-search .i { position: absolute; z-index: 1; left: 18px; color: rgb(255 255 255 / 75%); pointer-events: none; }
+    .web-search input {
+      width: 100%; height: 50px; padding: 0 20px 0 48px; font: inherit; font-size: 15px; color: #fff;
+      border: 1px solid rgb(255 255 255 / 25%); border-radius: 999px; outline: none;
+      background: rgb(20 24 32 / 32%); backdrop-filter: blur(14px) saturate(140%); transition: background .15s, border-color .15s;
+    }
+    .web-search input::placeholder { color: rgb(255 255 255 / 70%); }
+    .web-search input:hover { background: rgb(20 24 32 / 42%); }
+    .web-search input:focus { background: rgb(20 24 32 / 55%); border-color: rgb(255 255 255 / 55%); }
+    .web-search input::-webkit-search-cancel-button { filter: invert(1); }
+    .zones { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 28px; }
     .zone {
       width: 190px; padding: 14px 16px; text-align: left; text-shadow: none;
       border: 1px solid rgb(255 255 255 / 22%); border-radius: 14px;
@@ -498,6 +509,11 @@
           <div class="greet" id="greet"></div>
           <div class="big-time" id="bigTime"> <span id="bigAmpm"></span></div>
           <div class="big-date" id="bigDate"></div>
+          <!-- Plain Google search form; opens results in a new tab so this page stays put. -->
+          <form class="web-search" action="https://www.google.com/search" method="get" target="_blank" role="search">
+            <svg class="i"><use href="#i-search"/></svg>
+            <input name="q" type="search" autocomplete="off" placeholder="Search Google" aria-label="Search Google" required>
+          </form>
           <div class="zones" id="zones"></div>
         </div>
         <div class="home-bar">
