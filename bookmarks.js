@@ -7,6 +7,7 @@ const ALL = '\0all';
 const HOME = '\0home';
 const TODO = '\0todo';
 const NOTES = '\0notes';
+const WEB = '\0web';
 
 // Line icon from the <symbol> sprite in bookmarks.html.
 function svgIcon(name) {
@@ -74,7 +75,7 @@ async function load() {
   const { bookmarks = [], folders = [], todos = [], notes = [] } = await chrome.storage.local.get(['bookmarks', 'folders', 'todos', 'notes']);
   data = { bookmarks, folders: [...new Set([...folders, ...bookmarks.map(folderOf)])], todos,
     notes: draft && !notes.some(n => n.id === draft.id) ? [draft, ...notes] : notes };
-  if (![ALL, HOME, TODO, NOTES].includes(selected) && !data.folders.includes(selected)) selected = ALL;
+  if (![ALL, HOME, TODO, NOTES, WEB].includes(selected) && !data.folders.includes(selected)) selected = ALL;
   render();
 }
 
@@ -146,6 +147,7 @@ function render() {
     navButton(TODO, 'To-do', data.todos.filter(t => !t.done).length || null, 'todo'),
     navButton(NOTES, 'Notes', data.notes.length || null, 'note'),
     navButton(ALL, 'All bookmarks', bookmarks.length, 'all'),
+    navButton(WEB, 'Web', null, 'globe'),
     el('div', { className: 'label', textContent: 'Folders', title: 'Drag a folder to reorder, or Alt+Up / Alt+Down' }),
     ...folders.map(folderButton)
   );
@@ -163,7 +165,10 @@ function render() {
   const notesMode = !q && selected === NOTES;
   if (!notesMode) dropDraft();
   $('notes').hidden = !notesMode;
+  const webMode = !q && selected === WEB;
+  $('web').hidden = !webMode; // only hidden, so the site stays loaded
   if (homeMode) return;
+  if (webMode) { $('wrap').hidden = true; return openWeb(); }
   if (todoMode) { $('wrap').hidden = true; return renderTodos(); }
   if (notesMode) { $('wrap').hidden = true; return renderNotes(); }
 
@@ -587,3 +592,38 @@ function folderButton(f) {
   };
   return b;
 }
+
+// ---------- Web: open sites inside this tab ----------
+// Sites that refuse to be framed (X-Frame-Options / CSP frame-ancestors) get those headers
+// dropped, but only for frames inside this one tab (a session rule, gone on browser restart).
+let webReady;
+function openWeb() {
+  webReady ??= (async () => {
+    const me = await chrome.tabs.getCurrent();
+    if (me) await chrome.declarativeNetRequest.updateSessionRules({
+      removeRuleIds: [me.id],
+      addRules: [{ id: me.id, priority: 1,
+        action: { type: 'modifyHeaders', responseHeaders: [
+          { header: 'x-frame-options', operation: 'remove' },
+          { header: 'content-security-policy', operation: 'remove' }] },
+        condition: { tabIds: [me.id], resourceTypes: ['sub_frame'] } }],
+    });
+    const { webUrl } = await chrome.storage.local.get('webUrl');
+    if (webUrl && !$('webFrame').src) goWeb(webUrl);
+  })().catch(e => { console.error(e); webReady = null; });
+  if (!$('webFrame').src) $('webUrl').focus();
+}
+function goWeb(text) {
+  text = text.trim();
+  if (!text) return;
+  const url = /^[a-z][a-z0-9+.-]*:\/\//i.test(text) ? text
+    : /^\S+\.\S{2,}$/.test(text) ? `https://${text}`
+    : `https://www.google.com/search?q=${encodeURIComponent(text)}`;
+  $('webUrl').value = url;
+  $('webFrame').src = url;
+  chrome.storage.local.set({ webUrl: url }); // reopens here next time
+}
+$('webForm').onsubmit = async e => { e.preventDefault(); await webReady; goWeb($('webUrl').value); };
+$('webReload').onclick = () => $('webFrame').src && ($('webFrame').src = $('webFrame').src);
+// Links clicked inside the site aren't visible to us, so this opens the last typed address.
+$('webPop').onclick = () => $('webFrame').src && chrome.tabs.create({ url: $('webFrame').src });
