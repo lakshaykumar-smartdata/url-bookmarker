@@ -34,14 +34,13 @@ async function mergeBookmarks(data) {
   return added;
 }
 
-// The pinned bookmarks tab, if open. New tabs show the same page but aren't pinned, so look
-// for the pinned one. Checks the tabs' URLs (not running pages) so a pinned tab the browser
+// The pinned bookmarks tab, if open. Checks the tabs' URLs (not running pages) so a pinned tab the browser
 // restored but hasn't loaded yet still counts.
 const PINNED_PAGE = 'bookmarks.html#pinned';
 async function findPinnedPages() {
   const base = chrome.runtime.getURL('bookmarks.html');
   const tabs = await chrome.tabs.query({ pinned: true });
-  return tabs.filter(t => [t.url, t.pendingUrl].some(u => u?.startsWith(base) || /^(chrome|edge):\/\/newtab\/?$/.test(u || '')));
+  return tabs.filter(t => [t.url, t.pendingUrl].some(u => u?.startsWith(base)));
 }
 const findPinnedPage = async () => (await findPinnedPages())[0] ?? null;
 
