@@ -291,6 +291,15 @@
       border: 1px solid var(--border); border-radius: 8px; background: var(--surface); outline: none;
     }
     .home-settings select:focus, .home-settings input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+    .home-settings { max-height: calc(100% - 80px); overflow-y: auto; }
+    .hs-zones { display: grid; gap: 6px; }
+    .hs-title { font-size: 12px; font-weight: 600; }
+    #hsZones { display: grid; grid-template-columns: none; gap: 6px; margin: 0; padding: 0; list-style: none; }
+    #hsZones li { display: flex; gap: 6px; align-items: center; padding: 0; border: 0; background: none; box-shadow: none; backdrop-filter: none; }
+    .hs-zones li input { flex: 1; min-width: 0; }
+    .hs-zones .tz { font-size: 11px; color: var(--faint); white-space: nowrap; }
+    .hs-add { display: flex; gap: 6px; }
+    .hs-add input { flex: 1; min-width: 0; }
     .home-settings .note { margin: 0; font-size: 12px; color: var(--danger); }
     .home-settings .note:empty { display: none; }
     .todo-add { position: relative; display: flex; align-items: center; margin-bottom: 12px; }
@@ -500,6 +509,15 @@
           <label>Your name <span class="opt">shown in the greeting</span>
             <input id="hsName" autocomplete="off" maxlength="40" placeholder="e.g. Lakshay">
           </label>
+          <div class="hs-zones">
+            <span class="hs-title">World clocks <span class="opt">rename or remove, changes apply at once</span></span>
+            <ul id="hsZones"></ul>
+            <div class="hs-add">
+              <input id="hsZoneTz" list="tzList" autocomplete="off" placeholder="Add a city, e.g. London" aria-label="Add a time zone">
+              <button class="btn small" type="button" id="hsZoneAdd">Add</button>
+            </div>
+            <datalist id="tzList"></datalist>
+          </div>
           <label>Change photo every
             <select id="hsInterval">
               <option value="15">15 seconds</option>

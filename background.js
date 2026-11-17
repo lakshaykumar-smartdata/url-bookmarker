@@ -68,12 +68,14 @@ const queue = fn => (chain = chain.then(fn).catch(console.error));
 
 // Stamp every add/remove. A write that includes syncStamps came from sync itself: skip it.
 chrome.storage.onChanged.addListener((changes, area) => {
-  const hs = changes.homeSettings, nameChanged = hs && (hs.oldValue?.name || '') !== (hs.newValue?.name || '');
-  if (area !== 'local' || changes.syncStamps || (!changes.bookmarks && !changes.folders && !changes.todos && !changes.notes && !nameChanged)) return;
+  const hs = changes.homeSettings;
+  const changed = k => JSON.stringify(hs?.oldValue?.[k] ?? null) !== JSON.stringify(hs?.newValue?.[k] ?? null);
+  const settings = hs ? ['name', 'zones'].filter(changed) : [];
+  if (area !== 'local' || changes.syncStamps || (!changes.bookmarks && !changes.folders && !changes.todos && !changes.notes && !settings.length)) return;
   queue(async () => {
     const now = Date.now();
     const { syncStamps = {} } = await chrome.storage.local.get('syncStamps');
-    if (nameChanged) syncStamps['p:name'] = { t: now };
+    for (const k of settings) syncStamps[`p:${k}`] = { t: now };
     const diff = (ch, key) => { // added or edited -> {t}, removed -> {t, del}
       if (!ch) return;
       const before = new Map((ch.oldValue || []).map(x => [key(x), JSON.stringify(x)]));
@@ -126,12 +128,12 @@ async function sync() {
       }
     }
     const local = await chrome.storage.local.get(['bookmarks', 'folders', 'todos', 'notes', 'syncStamps', 'homeSettings']);
-    const mine = { name: local.homeSettings?.name || '', bookmarks: local.bookmarks || [], folders: local.folders || [], todos: local.todos || [], notes: local.notes || [], stamps: local.syncStamps || {} };
+    const mine = { name: local.homeSettings?.name || '', zones: local.homeSettings?.zones, bookmarks: local.bookmarks || [], folders: local.folders || [], todos: local.todos || [], notes: local.notes || [], stamps: local.syncStamps || {} };
     const merged = mergeSync(mine, remote);
     // ponytail: an edit landing between this read and the write below (a few ms) is lost locally; its stamp survives.
     if (syncFingerprint(merged) !== syncFingerprint(mine)) {
       await chrome.storage.local.set({ bookmarks: merged.bookmarks, folders: merged.folders, todos: merged.todos, notes: merged.notes, syncStamps: merged.stamps,
-        homeSettings: { ...local.homeSettings, name: merged.name } });
+        homeSettings: { ...local.homeSettings, name: merged.name, ...(merged.zones && { zones: merged.zones }) } });
     }
     const content = JSON.stringify(merged);
     if (!gistId) {

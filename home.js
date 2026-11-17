@@ -69,7 +69,7 @@ function tick() {
   $('greet').textContent = (hr < 5 ? 'Good night' : hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening') + (home.settings.name ? `, ${home.settings.name}` : '');
 
   // A zone showing the same time as this PC is just the big clock again: skip it.
-  $('zones').replaceChildren(...ZONES.map(z => [z, zoneInfo(z.tz)]).filter(([, i]) => i.offset !== 'Same as you').map(([z, info]) => {
+  $('zones').replaceChildren(...(home.settings.zones || ZONES).map(z => [z, zoneInfo(z.tz)]).filter(([, i]) => i.offset !== 'Same as you').map(([z, info]) => {
     const card = el('div', { className: 'zone' });
     const top = el('div', { className: 'zone-top' });
     top.append(el('span', { textContent: z.label }), el('span', { className: 'abbr', textContent: info.abbr }));
@@ -163,6 +163,7 @@ $('homeSettingsBtn').onclick = () => {
   const open = $('homeSettings').hidden;
   $('homeSettings').hidden = !open;
   if (open) {
+    renderZoneEditor();
     $('hsName').value = home.settings.name;
     $('hsInterval').value = String(home.settings.interval);
     $('hsKey').value = home.settings.key;
@@ -186,9 +187,51 @@ $('homeSettings').onsubmit = async e => {
   showPhoto(Math.floor(Math.random() * home.photos.length));
 };
 
-// The name can arrive from the other browser through sync.
+// ---------- World clocks: add, rename, remove (in Home settings) ----------
+const cityOf = tz => tz.split('/').pop().replace(/_/g, ' ');
+const zones = () => home.settings.zones || ZONES;
+function saveZones(list) {
+  home.settings.zones = list;
+  tick();
+  chrome.storage.local.set({ homeSettings: home.settings });
+}
+function renderZoneEditor() {
+  $('hsZones').replaceChildren(...zones().map((z, i) => {
+    const label = el('input', { value: z.label, maxLength: 30, title: z.tz });
+    label.setAttribute('aria-label', `Name for ${z.tz}`);
+    label.onchange = () => saveZones(zones().map((x, j) => (j === i ? { ...x, label: label.value.trim() || cityOf(x.tz) } : x)));
+    const del = el('button', { type: 'button', className: 'icon-btn danger', title: `Remove ${z.label}` });
+    del.append(svgIcon('trash'));
+    del.onclick = () => { saveZones(zones().filter((_, j) => j !== i)); renderZoneEditor(); };
+    const li = el('li');
+    li.append(label, el('span', { className: 'tz', textContent: zoneInfo(z.tz).abbr }), del);
+    return li;
+  }));
+}
+const allZones = Intl.supportedValuesOf('timeZone');
+$('tzList').replaceChildren(...allZones.map(tz => el('option', { value: tz })));
+function addZone() {
+  const q = $('hsZoneTz').value.trim().toLowerCase().replace(/ /g, '_');
+  if (!q) return;
+  // Accept "Europe/London", "london" or "new york".
+  const tz = allZones.find(z => z.toLowerCase() === q) || allZones.find(z => cityOf(z).toLowerCase().replace(/ /g, '_') === q);
+  if (!tz) return toast('Pick a time zone from the list, e.g. Europe/London');
+  if (zones().some(z => z.tz === tz)) return toast(`${cityOf(tz)} is already there`);
+  saveZones([...zones(), { label: cityOf(tz), tz }]);
+  $('hsZoneTz').value = '';
+  renderZoneEditor();
+}
+$('hsZoneAdd').onclick = addZone;
+$('hsZoneTz').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); addZone(); } };
+
+// Name and clocks can arrive from the other browser through sync.
 chrome.storage.onChanged.addListener(({ homeSettings: c }) => {
-  if (c?.newValue && c.newValue.name !== home.settings.name) { home.settings.name = c.newValue.name; tick(); }
+  if (!c?.newValue) return;
+  const { name, zones: z } = c.newValue;
+  if (name === home.settings.name && JSON.stringify(z) === JSON.stringify(home.settings.zones)) return;
+  Object.assign(home.settings, { name, zones: z });
+  tick();
+  if (!$('homeSettings').hidden) renderZoneEditor();
 });
 
 (async () => {

@@ -15,7 +15,7 @@ A Chrome extension (Manifest V3) for saving pages into folders, with a bookmarks
 
 ## Sync between browsers
 
-Click **Sync** on the bookmarks page and paste a GitHub token that has only the `gist` permission. Do the same in each browser (Chrome, Edge, another PC) with the same token. Links are kept in a secret Gist named `url-bookmarker.json`. Each browser syncs every minute and right after a change. Deletes, folder renames, the To-do list, Notes and your Home greeting name sync too.
+Click **Sync** on the bookmarks page and paste a GitHub token that has only the `gist` permission. Do the same in each browser (Chrome, Edge, another PC) with the same token. Links are kept in a secret Gist named `url-bookmarker.json`. Each browser syncs every minute and right after a change. Deletes, folder renames, the To-do list, Notes, your Home greeting name and world clocks sync too.
 
 Every change is also backed up to `Downloads/URL Bookmarker/bookmarks.json`.
 
