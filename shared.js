@@ -41,14 +41,17 @@ async function mergeBookmarks(data) {
 // 3. Else nothing (the popup shows the first folder).
 const GENERIC_WORDS = new Set(['home', 'link', 'links', 'docs', 'misc', 'other', 'unsorted', 'test', 'tools', 'apps']);
 function suggestFolder(url = '', title = '', folders = [], bookmarks = []) {
-  const squash = s => s.toLowerCase().replace(/[^a-z0-9]/g, '');
-  const hay = squash(url.replace(/^[a-z]+:\/\//i, '') + ' ' + title);
+  // Matches only count at the start of a word in the URL/title, so "care" doesn't match
+  // healthcareitnews.com, and "maps" doesn't match sitemaps.
+  const words = s => s.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  const toks = words(url.replace(/^[a-z]+:\/\//i, '') + ' ' + title);
+  const runs = toks.map((_, i) => toks.slice(i, i + 4).join('')); // "crystal-care" -> "crystalcare..."
   const score = f => {
-    const whole = squash(f);
-    if (whole.length >= 3 && !GENERIC_WORDS.has(whole) && hay.includes(whole)) return whole.length * 2;
+    const whole = words(f).join('');
+    if (whole.length >= 3 && !GENERIC_WORDS.has(whole) && runs.some(r => r.startsWith(whole))) return whole.length * 2;
     // "Crystal Care CRM" -> any of its words of 4+ letters, e.g. "crystal" in crystalcare.com.au
-    return f.toLowerCase().split(/[^a-z0-9]+/)
-      .filter(w => w.length >= 4 && !GENERIC_WORDS.has(w) && hay.includes(w))
+    return words(f)
+      .filter(w => w.length >= 4 && !GENERIC_WORDS.has(w) && toks.some(t => t.startsWith(w)))
       .reduce((n, w) => n + w.length, 0);
   };
   let best = null, top = 0;
