@@ -18,7 +18,10 @@ const updateLabel = () => {
 };
 
 (async () => {
-  [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  // Opened from the right-click menu: save that link instead of the current tab.
+  const { pendingSave } = await chrome.storage.session.get('pendingSave');
+  if (pendingSave) chrome.storage.session.remove('pendingSave');
+  [tab] = pendingSave ? [pendingSave] : await chrome.tabs.query({ active: true, currentWindow: true });
   const { folders = [], bookmarks = [] } = await chrome.storage.local.get(['folders', 'bookmarks']);
   savedIn = tab?.url ? [...new Set(bookmarks.filter(b => sameUrl(b.url, tab.url)).map(b => b.folder || 'Unsorted'))] : [];
   if (savedIn.length) {

@@ -7,6 +7,22 @@ chrome.runtime.onInstalled.addListener(async () => {
   ensurePage();
 });
 
+// Right-click a link (or the page) -> "Save to URL Bookmarker": opens the normal save popup
+// for that link, so the folder suggestion works the same.
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.contextMenus.removeAll(() => // reload/update: don't add it twice
+    chrome.contextMenus.create({ id: 'save', title: 'Save to URL Bookmarker…', contexts: ['link', 'page'] }));
+});
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  const url = info.linkUrl || info.pageUrl;
+  const title = info.linkUrl ? (info.selectionText || info.linkText || '').trim() || url : tab?.title || url;
+  await chrome.storage.session.set({ pendingSave: { url, title, favIconUrl: info.linkUrl ? undefined : tab?.favIconUrl } });
+  try { await chrome.action.openPopup(); } catch {
+    // Older browser or no toolbar button: show the same popup in a small window.
+    chrome.windows.create({ url: 'popup.html', type: 'popup', width: 380, height: 480 });
+  }
+});
+
 // 2) The bookmarks page always stays open as a pinned tab.
 //    Chrome doesn't let extensions block closing a tab, so if it's closed we open it again.
 const PAGE = chrome.runtime.getURL('bookmarks.html');
