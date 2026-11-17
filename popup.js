@@ -19,7 +19,7 @@ const updateLabel = () => {
 
 (async () => {
   [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  const { folders = [], lastFolder, bookmarks = [] } = await chrome.storage.local.get(['folders', 'lastFolder', 'bookmarks']);
+  const { folders = [], bookmarks = [] } = await chrome.storage.local.get(['folders', 'bookmarks']);
   savedIn = tab?.url ? [...new Set(bookmarks.filter(b => sameUrl(b.url, tab.url)).map(b => b.folder || 'Unsorted'))] : [];
   if (savedIn.length) {
     $('alreadyText').textContent = `Already saved in ${listFolders(savedIn)}`;
@@ -32,8 +32,11 @@ const updateLabel = () => {
   $('url').title = tab?.url || '';
   if (tab?.url) $('icon').replaceWith(Object.assign(siteIcon(tab.url, '', tab.favIconUrl), { id: 'icon' }));
 
-  const preselect = savedIn.find(f => folders.includes(f)) ?? lastFolder; // show where it already is
+  // Already saved: show where. Else a folder matching the page, else the first folder.
+  const suggested = suggestFolder(tab?.url, tab?.title, folders, bookmarks);
+  const preselect = savedIn.find(f => folders.includes(f)) ?? suggested ?? folders[0];
   $('folder').replaceChildren(...folders.map(f => new Option(f, f, false, f === preselect)));
+  $('suggested').hidden = !suggested || preselect !== suggested;
   $('pick').hidden = !folders.length;
   (folders.length ? $('folder') : $('newFolder')).focus();
   updateLabel();

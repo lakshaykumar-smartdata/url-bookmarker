@@ -32,6 +32,7 @@
     form { display: grid; gap: 12px; padding: 16px; }
     .field { display: grid; gap: 6px; }
     label { font-size: 12px; font-weight: 600; color: #3f3f46; }
+    .tag { margin-left: 6px; padding: 1px 7px; border-radius: 99px; background: var(--accent-ring); color: var(--accent); font-size: 11px; font-weight: 500; }
     .control { position: relative; display: flex; align-items: center; }
     .control .i { position: absolute; color: var(--faint); pointer-events: none; }
     .control .lead { left: 11px; }
@@ -98,7 +99,7 @@
 
   <form id="form">
     <div id="pick" class="field">
-      <label for="folder">Save to folder</label>
+      <label for="folder">Save to folder <span class="tag" id="suggested" hidden>Suggested for this page</span></label>
       <div class="control">
         <svg class="i lead"><use href="#i-folder"/></svg>
         <select id="folder"></select>

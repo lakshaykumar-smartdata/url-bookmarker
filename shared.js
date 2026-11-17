@@ -34,6 +34,32 @@ async function mergeBookmarks(data) {
   return added;
 }
 
+// ---------- Folder suggestion for the popup ----------
+// 1. A folder whose name shows up in the page's URL or title ("EligibilityOS" in
+//    github.com/sdeitech/EligibilityOS-Frontend). Longest match wins.
+// 2. Else the folder that already holds the most links from the same site.
+// 3. Else nothing (the popup shows the first folder).
+const GENERIC_WORDS = new Set(['home', 'link', 'links', 'docs', 'misc', 'other', 'unsorted', 'test', 'tools', 'apps']);
+function suggestFolder(url = '', title = '', folders = [], bookmarks = []) {
+  const squash = s => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const hay = squash(url.replace(/^[a-z]+:\/\//i, '') + ' ' + title);
+  const score = f => {
+    const whole = squash(f);
+    if (whole.length >= 3 && !GENERIC_WORDS.has(whole) && hay.includes(whole)) return whole.length * 2;
+    // "Crystal Care CRM" -> any of its words of 4+ letters, e.g. "crystal" in crystalcare.com.au
+    return f.toLowerCase().split(/[^a-z0-9]+/)
+      .filter(w => w.length >= 4 && !GENERIC_WORDS.has(w) && hay.includes(w))
+      .reduce((n, w) => n + w.length, 0);
+  };
+  let best = null, top = 0;
+  for (const f of folders) { const s = score(f); if (s > top) { best = f; top = s; } }
+  if (best) return best;
+  const hostOf = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } };
+  const host = hostOf(url), count = {};
+  if (host) for (const b of bookmarks) if (hostOf(b.url) === host) count[b.folder || 'Unsorted'] = (count[b.folder || 'Unsorted'] || 0) + 1;
+  return folders.filter(f => count[f]).sort((a, b) => count[b] - count[a])[0] ?? null;
+}
+
 // ---------- Sync merge ----------
 // Every bookmark/folder add or remove gets a stamp {t, del}. Removes stay as tombstones,
 // so a delete in one browser deletes everywhere instead of coming back on the next merge.
