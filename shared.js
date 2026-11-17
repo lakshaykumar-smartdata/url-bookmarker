@@ -72,13 +72,15 @@ function mergeSync(a, b) {
     folders.sort((x, y) => (rank.get(x) ?? Infinity) - (rank.get(y) ?? Infinity));
   }
   for (const x of bookmarks) if (!folders.includes(x.folder || 'Unsorted')) folders.push(x.folder || 'Unsorted');
-  return { bookmarks, folders, todos: [...freshT, ...ownT], notes: [...freshN, ...ownN], stamps: Object.fromEntries(Object.entries(stamps).sort(([x], [y]) => (x < y ? -1 : 1))) };
+  // Your name (Home greeting): newest wins, Gist wins a tie. An old Gist with no name keeps yours.
+  const name = b.name !== undefined && (sb['p:name']?.t ?? 0) >= (sa['p:name']?.t ?? 0) ? b.name : a.name || '';
+  return { name, bookmarks, folders, todos: [...freshT, ...ownT], notes: [...freshN, ...ownN], stamps: Object.fromEntries(Object.entries(stamps).sort(([x], [y]) => (x < y ? -1 : 1))) };
 }
 
 // Fingerprint of what's synced. Link order is ignored, so two browsers with the same links in a
 // different order don't keep re-uploading.
 const syncFingerprint = s => JSON.stringify([
-  s.bookmarks.map(bKey).sort(), s.folders, s.stamps, // folder order matters, it's shown in the sidebar
+  s.name || '', s.bookmarks.map(bKey).sort(), s.folders, s.stamps, // folder order matters, it's shown in the sidebar
   (s.todos || []).map(t => JSON.stringify([t.id, t.text, t.done])).sort(),
   (s.notes || []).map(n => JSON.stringify([n.id, n.title, n.html ?? n.body])).sort(),
 ]);

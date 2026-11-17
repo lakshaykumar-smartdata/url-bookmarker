@@ -186,6 +186,11 @@ $('homeSettings').onsubmit = async e => {
   showPhoto(Math.floor(Math.random() * home.photos.length));
 };
 
+// The name can arrive from the other browser through sync.
+chrome.storage.onChanged.addListener(({ homeSettings: c }) => {
+  if (c?.newValue && c.newValue.name !== home.settings.name) { home.settings.name = c.newValue.name; tick(); }
+});
+
 (async () => {
   const { homeSettings } = await chrome.storage.local.get('homeSettings');
   home.settings = { ...HOME_DEFAULTS, ...homeSettings };
