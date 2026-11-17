@@ -34,7 +34,7 @@ const ZONES = [
   { label: 'US Central', tz: 'America/Chicago' },
   { label: 'Israel', tz: 'Asia/Jerusalem' },
 ];
-const HOME_DEFAULTS = { interval: 60, key: '', collection: '1263731', paused: false };
+const HOME_DEFAULTS = { name: '', interval: 60, key: '', collection: '1263731', paused: false };
 const UTM = '?utm_source=url_bookmarker&utm_medium=referral';
 
 const home = { settings: { ...HOME_DEFAULTS }, photos: BUILTIN_PHOTOS, index: 0, visible: false, timer: null, layer: 0 };
@@ -59,14 +59,6 @@ function zoneInfo(tz) {
   };
 }
 
-// Browsers never show extensions the Windows user name; the closest is the account the
-// browser profile is signed in with. "lakshay.kumar@x.com" -> "Lakshay". Not signed in: no name.
-let who = '';
-chrome.identity?.getProfileUserInfo({ accountStatus: 'ANY' }, u => {
-  const first = (u?.email || '').split('@')[0].split(/[._\-+\d]+/).find(Boolean) || '';
-  who = first && first[0].toUpperCase() + first.slice(1).toLowerCase();
-});
-
 function tick() {
   const now = new Date();
   const [hm, ampm] = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).split(' ');
@@ -74,7 +66,7 @@ function tick() {
   $('bigAmpm').textContent = ampm || '';
   $('bigDate').textContent = now.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' });
   const hr = now.getHours();
-  $('greet').textContent = (hr < 5 ? 'Good night' : hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening') + (who ? `, ${who}` : '');
+  $('greet').textContent = (hr < 5 ? 'Good night' : hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening') + (home.settings.name ? `, ${home.settings.name}` : '');
 
   $('zones').replaceChildren(...ZONES.map(z => {
     const info = zoneInfo(z.tz);
@@ -171,6 +163,7 @@ $('homeSettingsBtn').onclick = () => {
   const open = $('homeSettings').hidden;
   $('homeSettings').hidden = !open;
   if (open) {
+    $('hsName').value = home.settings.name;
     $('hsInterval').value = String(home.settings.interval);
     $('hsKey').value = home.settings.key;
     $('hsCollection').value = home.settings.collection;
@@ -180,12 +173,14 @@ $('homeSettings').onsubmit = async e => {
   e.preventDefault();
   home.settings = {
     ...home.settings,
+    name: $('hsName').value.trim(),
     interval: Number($('hsInterval').value) || HOME_DEFAULTS.interval,
     key: $('hsKey').value.trim(),
     collection: $('hsCollection').value.trim() || HOME_DEFAULTS.collection,
   };
   await chrome.storage.local.set({ homeSettings: home.settings });
   $('homeSettings').hidden = true;
+  tick();
   await loadPhotos();
   if ($('homeNote').textContent) $('homeSettings').hidden = false; // keep the error visible
   showPhoto(Math.floor(Math.random() * home.photos.length));

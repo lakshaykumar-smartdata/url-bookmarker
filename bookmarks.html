@@ -492,11 +492,14 @@
             <button class="glass-btn" id="homePrev" title="Previous photo"><svg class="i"><use href="#i-left"/></svg></button>
             <button class="glass-btn" id="homePause" title="Pause slideshow" aria-pressed="false"><svg class="i"><use href="#i-pause"/></svg></button>
             <button class="glass-btn" id="homeNext" title="Next photo"><svg class="i"><use href="#i-right"/></svg></button>
-            <button class="glass-btn" id="homeSettingsBtn" title="Slideshow settings"><svg class="i"><use href="#i-sliders"/></svg></button>
+            <button class="glass-btn" id="homeSettingsBtn" title="Home settings"><svg class="i"><use href="#i-sliders"/></svg></button>
           </div>
         </div>
         <form class="home-settings" id="homeSettings" hidden>
-          <strong>Slideshow</strong>
+          <strong>Home</strong>
+          <label>Your name <span class="opt">shown in the greeting</span>
+            <input id="hsName" autocomplete="off" maxlength="40" placeholder="e.g. Lakshay">
+          </label>
           <label>Change photo every
             <select id="hsInterval">
               <option value="15">15 seconds</option>
