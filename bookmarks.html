@@ -307,7 +307,11 @@
       border: 1px solid var(--border); border-radius: 8px; background: var(--surface); outline: none;
     }
     .home-settings select:focus, .home-settings input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
-    .home-settings { max-height: calc(100% - 80px); overflow-y: auto; }
+    .home-settings { max-height: calc(100% - 80px); overflow-y: auto; overflow-x: hidden; }
+    /* Home settings: two columns side by side, so it fits without scrolling. */
+    #homeSettings { width: 640px; max-width: calc(100% - 36px); grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+    .hs-col { display: grid; gap: 12px; min-width: 0; }
+    .hs-col .primary-btn { justify-self: start; }
     .hs-zones { display: grid; gap: 6px; }
     .hs-title { font-size: 12px; font-weight: 600; }
     #hsZones { display: grid; grid-template-columns: none; gap: 6px; margin: 0; padding: 0; list-style: none; }
@@ -427,6 +431,7 @@
       .zone { width: calc(50% - 6px); padding: 12px; }
       .zone-time { font-size: 22px; }
       .home-settings { left: 12px; right: 12px; width: auto; }
+      #homeSettings { width: auto; max-width: none; grid-template-columns: 1fr; }
       .chip { display: none; }
       .folder-actions .btn span { display: none; }
       li { grid-template-columns: 34px minmax(0, 1fr) auto; }
@@ -532,12 +537,13 @@
           </div>
         </div>
         <form class="home-settings" id="homeSettings" hidden>
+          <div class="hs-col">
           <strong>Home</strong>
           <label>Your name <span class="opt">shown in the greeting</span>
             <input id="hsName" autocomplete="off" maxlength="40" placeholder="e.g. Lakshay">
           </label>
           <div class="hs-zones">
-            <span class="hs-title">World clocks <span class="opt">drag to reorder, rename or remove; changes apply at once</span></span>
+            <span class="hs-title">World clocks <span class="opt">drag to reorder; changes apply at once</span></span>
             <ul id="hsZones"></ul>
             <div class="hs-add">
               <input id="hsZoneTz" list="tzList" autocomplete="off" placeholder="Add a city, e.g. London" aria-label="Add a time zone">
@@ -545,6 +551,9 @@
             </div>
             <datalist id="tzList"></datalist>
           </div>
+          </div>
+          <div class="hs-col">
+          <strong>Slideshow</strong>
           <label>Change photo every
             <select id="hsInterval">
               <option value="15">15 seconds</option>
@@ -563,6 +572,7 @@
           </label>
           <p class="note" id="homeNote"></p>
           <button class="btn small primary-btn" type="submit">Save</button>
+          </div>
         </form>
       </section>
       <section class="wrap todo" id="todo" hidden>
