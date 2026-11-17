@@ -31,7 +31,11 @@ let pending; // startup fires several events at once; only open one tab
 // windowId: where to open it if it's missing. Default: the window you used last.
 function ensurePage(windowId) {
   pending ??= (async () => {
-    if (await findPinnedPage()) return;
+    const open = await findPinnedPages();
+    // Copies left over from earlier restarts: keep one (the one you're looking at, if any).
+    open.sort((a, b) => b.active - a.active);
+    if (open.length > 1) await chrome.tabs.remove(open.slice(1).map(t => t.id)).catch(() => {});
+    if (open.length) return;
     if (windowId === undefined) {
       windowId = (await chrome.windows.getLastFocused({ windowTypes: ['normal'] }).catch(() => null))?.id;
     }
