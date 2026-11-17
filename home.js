@@ -68,8 +68,8 @@ function tick() {
   const hr = now.getHours();
   $('greet').textContent = (hr < 5 ? 'Good night' : hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening') + (home.settings.name ? `, ${home.settings.name}` : '');
 
-  $('zones').replaceChildren(...ZONES.map(z => {
-    const info = zoneInfo(z.tz);
+  // A zone showing the same time as this PC is just the big clock again: skip it.
+  $('zones').replaceChildren(...ZONES.map(z => [z, zoneInfo(z.tz)]).filter(([, i]) => i.offset !== 'Same as you').map(([z, info]) => {
     const card = el('div', { className: 'zone' });
     const top = el('div', { className: 'zone-top' });
     top.append(el('span', { textContent: z.label }), el('span', { className: 'abbr', textContent: info.abbr }));
