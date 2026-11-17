@@ -600,13 +600,15 @@ let webReady;
 function openWeb() {
   webReady ??= (async () => {
     const me = await chrome.tabs.getCurrent();
-    if (me) await chrome.declarativeNetRequest.updateSessionRules({
-      removeRuleIds: [me.id],
-      addRules: [{ id: me.id, priority: 1,
-        action: { type: 'modifyHeaders', responseHeaders: [
-          { header: 'x-frame-options', operation: 'remove' },
-          { header: 'content-security-policy', operation: 'remove' }] },
-        condition: { tabIds: [me.id], resourceTypes: ['sub_frame'] } }],
+    const action = { type: 'modifyHeaders', responseHeaders: ['x-frame-options', 'frame-options', 'content-security-policy']
+      .map(header => ({ header, operation: 'remove' })) };
+    // 1: frames this page opens (started by the extension). 2: links clicked inside them, in this tab.
+    await chrome.declarativeNetRequest.updateSessionRules({
+      removeRuleIds: [1, 2],
+      addRules: [
+        { id: 1, priority: 1, action, condition: { initiatorDomains: [chrome.runtime.id], resourceTypes: ['sub_frame'] } },
+        ...(me ? [{ id: 2, priority: 1, action, condition: { tabIds: [me.id], resourceTypes: ['sub_frame'] } }] : []),
+      ],
     });
     const { webUrl } = await chrome.storage.local.get('webUrl');
     if (webUrl && !$('webFrame').src) goWeb(webUrl);
