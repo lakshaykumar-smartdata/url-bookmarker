@@ -197,8 +197,9 @@ function siteIcon(url, className = 'icon', knownIcon) {
 
 // Same file for the automatic backup and Export; Import reads it back.
 async function backupJson() {
-  const { bookmarks = [], folders = [], todos = [], notes = [] } = await chrome.storage.local.get(['bookmarks', 'folders', 'todos', 'notes']);
-  return JSON.stringify({ folders, bookmarks, todos, notes }, null, 2);
+  const { bookmarks = [], folders = [], todos = [], notes = [], homeSettings = {} } = await chrome.storage.local.get(['bookmarks', 'folders', 'todos', 'notes', 'homeSettings']);
+  const home = { name: homeSettings.name || '', ...(homeSettings.zones && { zones: homeSettings.zones }) }; // greeting + clocks
+  return JSON.stringify({ folders, bookmarks, todos, notes, home }, null, 2);
 }
 
 async function exportJson() {

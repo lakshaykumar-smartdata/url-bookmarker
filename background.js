@@ -59,13 +59,51 @@ chrome.downloads.setUiOptions({ enabled: true }).catch(() => {});
 let timer;
 const backupIds = new Set();
 
-chrome.storage.onChanged.addListener(changes => {
-  if (!changes.bookmarks && !changes.folders && !changes.todos && !changes.notes) return;
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'local' || (!changes.bookmarks && !changes.folders && !changes.todos && !changes.notes && !changes.homeSettings)) return;
   clearTimeout(timer);
   timer = setTimeout(backup, 1000);
 });
 
+// Reinstalled (the browser wiped this extension's storage): pull that backup file back in, once,
+// before the first new backup overwrites it. Works because an unpacked extension may read local
+// files ("Allow access to file URLs", on by default for unpacked extensions).
+// After it, paste the GitHub token again and sync catches up with the other browsers.
+const restoring = (async () => {
+  const { restoreChecked } = await chrome.storage.local.get('restoreChecked');
+  if (restoreChecked) return;
+  try {
+    const dir = await chrome.extension.isAllowedFileSchemeAccess() && await downloadsFolder();
+    const res = dir && await fetch(encodeURI(`file:///${dir.replace(/\\/g, '/')}/bookmarks.json`)).catch(() => null);
+    const data = res?.ok && JSON.parse(await res.text());
+    if (data) {
+      const added = await mergeBookmarks(data);
+      const { homeSettings = {} } = await chrome.storage.local.get('homeSettings');
+      if (data.home && !homeSettings.name && !homeSettings.zones) await chrome.storage.local.set({ homeSettings: { ...homeSettings, ...data.home } });
+      if (added) await chrome.storage.local.set({ restoredNotice: added }); // the bookmarks page shows a toast
+    }
+  } catch (e) { console.error('Restore from backup failed', e); }
+  await chrome.storage.local.set({ restoreChecked: true });
+})();
+
+// Extensions can't ask where Downloads is, so save a tiny file next to the backup, read its
+// full path, then delete it.
+async function downloadsFolder() {
+  await chrome.downloads.setUiOptions({ enabled: false }).catch(() => {});
+  try {
+    const id = await chrome.downloads.download({ url: 'data:text/plain,', filename: 'URL Bookmarker/where.txt', conflictAction: 'overwrite', saveAs: false });
+    let item;
+    for (let i = 0; i < 100 && (item = (await chrome.downloads.search({ id }))[0])?.state === 'in_progress'; i++) await new Promise(r => setTimeout(r, 100));
+    await chrome.downloads.removeFile(id).catch(() => {});
+    await chrome.downloads.erase({ id });
+    return item?.state === 'complete' ? item.filename.replace(/[\\/][^\\/]+$/, '') : null;
+  } finally {
+    chrome.downloads.setUiOptions({ enabled: true }).catch(() => {});
+  }
+}
+
 async function backup() {
+  await restoring; // never overwrite the old backup before it was read back
   const json = await backupJson();
   // ponytail: hides Chrome's download bubble only while our backup is saving.
   await chrome.downloads.setUiOptions({ enabled: false });
