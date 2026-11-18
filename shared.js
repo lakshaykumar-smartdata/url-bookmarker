@@ -30,7 +30,16 @@ async function mergeBookmarks(data) {
     bookmarks.push({ url: b.url, title: b.title || b.url, folder, icon: b.icon, savedAt: b.savedAt || new Date().toISOString() });
     added++;
   }
-  await chrome.storage.local.set({ bookmarks, folders });
+  // To-dos and notes from a backup file: add the ones this browser doesn't have (by id).
+  const extra = {};
+  for (const k of ['todos', 'notes']) {
+    if (!Array.isArray(data?.[k])) continue;
+    const { [k]: have = [] } = await chrome.storage.local.get(k);
+    const ids = new Set(have.map(x => x.id));
+    const fresh = data[k].filter(x => x?.id && !ids.has(x.id) && ids.add(x.id));
+    if (fresh.length) { extra[k] = [...fresh, ...have]; added += fresh.length; }
+  }
+  await chrome.storage.local.set({ bookmarks, folders, ...extra });
   return added;
 }
 
@@ -186,10 +195,16 @@ function siteIcon(url, className = 'icon', knownIcon) {
   return img;
 }
 
+// Same file for the automatic backup and Export; Import reads it back.
+async function backupJson() {
+  const { bookmarks = [], folders = [], todos = [], notes = [] } = await chrome.storage.local.get(['bookmarks', 'folders', 'todos', 'notes']);
+  return JSON.stringify({ folders, bookmarks, todos, notes }, null, 2);
+}
+
 async function exportJson() {
-  const { bookmarks = [], folders = [] } = await chrome.storage.local.get(['bookmarks', 'folders']);
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([JSON.stringify({ folders, bookmarks }, null, 2)], { type: 'application/json' }));
+  a.href = URL.createObjectURL(new Blob([await backupJson()], { type: 'application/json' }));
   a.download = 'bookmarks.json';
   a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }

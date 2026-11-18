@@ -10,7 +10,8 @@ A Chrome extension (Manifest V3) for saving pages into folders, with a bookmarks
 
 ## Bringing in existing bookmarks
 
-- **Import** on the bookmarks page accepts this extension's JSON export or a Bonjourr backup.
+- **Import** on the bookmarks page accepts this extension's JSON export or a Bonjourr backup. It only adds what's missing (links, to-dos, notes); nothing you have is changed.
+- Every change is also backed up to `Downloads/URL Bookmarker/bookmarks.json`, with links, folders, to-dos and notes. **Export** saves the same file.
 - Or put a `bookmarks.json` (same format as **Export**) in this folder and reload the extension. It's merged in once and is git-ignored, so personal links stay out of the repo.
 
 ## Sync between browsers

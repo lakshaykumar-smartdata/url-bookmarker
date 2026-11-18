@@ -250,7 +250,7 @@ $('import').onclick = () => $('file').click();
 $('file').onchange = async () => {
   try {
     const added = await mergeBookmarks(JSON.parse(await $('file').files[0].text()));
-    toast(`Imported ${plural(added, 'new link')}. Existing links were kept.`);
+    toast(`Imported ${plural(added, 'new item')}. Nothing you already had was changed.`);
   } catch (e) {
     toast(`Couldn't import that file: ${e.message}`);
   }

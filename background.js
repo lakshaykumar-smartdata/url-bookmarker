@@ -60,14 +60,13 @@ let timer;
 const backupIds = new Set();
 
 chrome.storage.onChanged.addListener(changes => {
-  if (!changes.bookmarks && !changes.folders) return;
+  if (!changes.bookmarks && !changes.folders && !changes.todos && !changes.notes) return;
   clearTimeout(timer);
   timer = setTimeout(backup, 1000);
 });
 
 async function backup() {
-  const { bookmarks = [], folders = [] } = await chrome.storage.local.get(['bookmarks', 'folders']);
-  const json = JSON.stringify({ folders, bookmarks }, null, 2);
+  const json = await backupJson();
   // ponytail: hides Chrome's download bubble only while our backup is saving.
   await chrome.downloads.setUiOptions({ enabled: false });
   try {
