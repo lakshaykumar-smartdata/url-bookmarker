@@ -260,7 +260,12 @@ $('file').onchange = async () => {
 seedFromBundle().finally(load); // also here, in case the background import didn't run
 
 // After a reinstall the background pulls the Downloads backup back in (see background.js).
-const restoredToast = n => n && (toast(`Restored ${plural(n, 'item')} from your backup in Downloads. Paste your GitHub token in Sync to sync again.`), chrome.storage.local.remove('restoredNotice'));
+const restoredToast = r => {
+  if (!r) return;
+  const { added = r, sync } = typeof r === 'object' ? r : {};
+  toast(`Restored ${plural(added, 'item')} from your backup in Downloads. ${sync ? 'Sync is back on.' : 'Paste your GitHub token in Sync to sync again.'}`);
+  chrome.storage.local.remove('restoredNotice');
+};
 chrome.storage.local.get('restoredNotice').then(r => restoredToast(r.restoredNotice));
 chrome.storage.onChanged.addListener(c => restoredToast(c.restoredNotice?.newValue));
 chrome.storage.onChanged.addListener(c => (c.bookmarks || c.folders || c.todos || c.notes) && load());

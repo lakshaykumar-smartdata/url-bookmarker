@@ -196,10 +196,13 @@ function siteIcon(url, className = 'icon', knownIcon) {
 }
 
 // Same file for the automatic backup and Export; Import reads it back.
-async function backupJson() {
-  const { bookmarks = [], folders = [], todos = [], notes = [], homeSettings = {} } = await chrome.storage.local.get(['bookmarks', 'folders', 'todos', 'notes', 'homeSettings']);
+// withToken: only the automatic backup in Downloads carries the GitHub token, so a reinstall can turn
+// sync back on. Export leaves it out, because that's the file you'd share.
+async function backupJson(withToken = false) {
+  const { bookmarks = [], folders = [], todos = [], notes = [], homeSettings = {}, syncSettings } = await chrome.storage.local.get(['bookmarks', 'folders', 'todos', 'notes', 'homeSettings', 'syncSettings']);
   const home = { name: homeSettings.name || '', ...(homeSettings.zones && { zones: homeSettings.zones }) }; // greeting + clocks
-  return JSON.stringify({ folders, bookmarks, todos, notes, home }, null, 2);
+  const sync = withToken && syncSettings?.token ? { sync: { token: syncSettings.token, gistId: syncSettings.gistId } } : {};
+  return JSON.stringify({ folders, bookmarks, todos, notes, home, ...sync }, null, 2);
 }
 
 async function exportJson() {

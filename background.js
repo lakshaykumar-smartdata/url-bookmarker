@@ -60,7 +60,7 @@ let timer;
 const backupIds = new Set();
 
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== 'local' || (!changes.bookmarks && !changes.folders && !changes.todos && !changes.notes && !changes.homeSettings)) return;
+  if (area !== 'local' || (!changes.bookmarks && !changes.folders && !changes.todos && !changes.notes && !changes.homeSettings && !changes.syncSettings)) return;
   clearTimeout(timer);
   timer = setTimeout(backup, 1000);
 });
@@ -80,7 +80,12 @@ const restoring = (async () => {
       const added = await mergeBookmarks(data);
       const { homeSettings = {} } = await chrome.storage.local.get('homeSettings');
       if (data.home && !homeSettings.name && !homeSettings.zones) await chrome.storage.local.set({ homeSettings: { ...homeSettings, ...data.home } });
-      if (added) await chrome.storage.local.set({ restoredNotice: added }); // the bookmarks page shows a toast
+      // The token too, so sync turns itself back on.
+      const { syncSettings } = await chrome.storage.local.get('syncSettings');
+      const token = typeof data.sync?.token === 'string' && !syncSettings?.token && data.sync.token;
+      if (token) await chrome.storage.local.set({ syncSettings: { token, gistId: data.sync.gistId }, syncDisabled: false });
+      if (added || token) await chrome.storage.local.set({ restoredNotice: { added, sync: !!token } }); // the bookmarks page shows a toast
+      if (token) queue(sync);
     }
   } catch (e) { console.error('Restore from backup failed', e); }
   await chrome.storage.local.set({ restoreChecked: true });
@@ -104,7 +109,7 @@ async function downloadsFolder() {
 
 async function backup() {
   await restoring; // never overwrite the old backup before it was read back
-  const json = await backupJson();
+  const json = await backupJson(true);
   // ponytail: hides Chrome's download bubble only while our backup is saving.
   await chrome.downloads.setUiOptions({ enabled: false });
   try {
