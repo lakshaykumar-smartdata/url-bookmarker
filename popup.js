@@ -21,7 +21,8 @@ const updateLabel = () => {
   // Opened from the right-click menu: save that link instead of the current tab.
   const { pendingSave } = await chrome.storage.session.get('pendingSave');
   if (pendingSave) chrome.storage.session.remove('pendingSave');
-  [tab] = pendingSave ? [pendingSave] : await chrome.tabs.query({ active: true, currentWindow: true });
+  // Older than a minute: the popup didn't open back then, so save the current tab instead.
+  [tab] = Date.now() - (pendingSave?.at ?? 0) < 60000 ? [pendingSave] : await chrome.tabs.query({ active: true, currentWindow: true });
   const { folders = [], bookmarks = [] } = await chrome.storage.local.get(['folders', 'bookmarks']);
   savedIn = tab?.url ? [...new Set(bookmarks.filter(b => sameUrl(b.url, tab.url)).map(b => b.folder || 'Unsorted'))] : [];
   if (savedIn.length) {

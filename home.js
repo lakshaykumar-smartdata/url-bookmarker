@@ -69,7 +69,7 @@ function tick() {
   $('greet').textContent = (hr < 5 ? 'Good night' : hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening') + (home.settings.name ? `, ${home.settings.name}` : '');
 
   // A zone showing the same time as this PC is just the big clock again: skip it.
-  $('zones').replaceChildren(...(home.settings.zones || ZONES).map(z => [z, zoneInfo(z.tz)]).filter(([, i]) => i.offset !== 'Same as you').map(([z, info]) => {
+  $('zones').replaceChildren(...zones().map(z => [z, zoneInfo(z.tz)]).filter(([, i]) => i.offset !== 'Same as you').map(([z, info]) => {
     const card = el('div', { className: 'zone' });
     const top = el('div', { className: 'zone-top' });
     top.append(el('span', { textContent: z.label }), el('span', { className: 'abbr', textContent: info.abbr }));
@@ -192,7 +192,8 @@ $('homeSettings').onsubmit = async e => {
 
 // ---------- World clocks: add, rename, remove (in Home settings) ----------
 const cityOf = tz => tz.split('/').pop().replace(/_/g, ' ');
-const zones = () => home.settings.zones || ZONES;
+const validTz = tz => { try { fmt(tz); return true; } catch { return false; } };
+const zones = () => (Array.isArray(home.settings.zones) ? home.settings.zones : ZONES).filter(z => z && validTz(z.tz));
 function saveZones(list) {
   home.settings.zones = list;
   tick();

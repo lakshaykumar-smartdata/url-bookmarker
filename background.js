@@ -2,7 +2,7 @@ importScripts('shared.js');
 
 // 1) On install / reload: merge the bundled bookmarks.json into storage.
 chrome.runtime.onInstalled.addListener(async () => {
-  await seedFromBundle();
+  await seedFromBundle().catch(e => console.error('bookmarks.json import failed', e));
   await chrome.storage.local.remove('reopenPage'); // old flag, no longer used
   ensurePage();
 });
@@ -16,7 +16,7 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   const url = info.linkUrl || info.pageUrl;
   const title = info.linkUrl ? (info.selectionText || info.linkText || '').trim() || url : tab?.title || url;
-  await chrome.storage.session.set({ pendingSave: { url, title, favIconUrl: info.linkUrl ? undefined : tab?.favIconUrl } });
+  await chrome.storage.session.set({ pendingSave: { url, title, favIconUrl: info.linkUrl ? undefined : tab?.favIconUrl, at: Date.now() } });
   try { await chrome.action.openPopup(); } catch {
     // Older browser or no toolbar button: show the same popup in a small window.
     chrome.windows.create({ url: 'popup.html', type: 'popup', width: 380, height: 480 });
@@ -53,6 +53,9 @@ chrome.tabs.onRemoved.addListener((tabId, { windowId, isWindowClosing }) => {
 });
 
 // 2) Every change is backed up silently to Downloads/URL Bookmarker/bookmarks.json.
+// The bubble is hidden only while a backup saves. If the browser stopped this script mid-backup,
+// turn it back on whenever the script starts again.
+chrome.downloads.setUiOptions({ enabled: true }).catch(() => {});
 let timer;
 const backupIds = new Set();
 
@@ -151,7 +154,9 @@ async function sync() {
     if (gistId) {
       try {
         const f = (await gh(`/gists/${gistId}`)).files[GIST_FILE];
-        if (f) remote = { ...remote, ...JSON.parse(f.truncated ? await (await fetch(f.raw_url)).text() : f.content) };
+        const got = f && JSON.parse(f.truncated ? await (await fetch(f.raw_url)).text() : f.content);
+        if (got) for (const k of Object.keys(got)) if (got[k] != null) remote[k] = got[k];
+        for (const k of ['bookmarks', 'folders', 'todos', 'notes']) if (!Array.isArray(remote[k])) remote[k] = [];
       } catch (e) {
         if (e.status !== 404) throw e;
         gistId = null; // Gist was deleted: make a new one

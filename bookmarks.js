@@ -86,7 +86,7 @@ function row(b, i, showFolder) {
 
   const info = el('div', { className: 'info' });
   info.append(
-    el('a', { href: b.url, target: '_blank', title: b.url, textContent: b.title || b.url }),
+    el('a', { href: /^\s*(javascript|data|vbscript):/i.test(b.url) ? '#' : b.url, target: '_blank', rel: 'noopener', title: b.url, textContent: b.title || b.url }),
     el('div', { className: 'meta', textContent: host(b.url) })
   );
 
@@ -241,7 +241,7 @@ $('deleteBtn').onclick = async () => {
 
 $('q').oninput = render;
 document.addEventListener('keydown', e => {
-  if (e.key === '/' && !/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) { e.preventDefault(); $('q').focus(); }
+  if (e.key === '/' && !/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName) && !document.activeElement.isContentEditable) { e.preventDefault(); $('q').focus(); }
   if (e.key === 'Escape' && document.activeElement === $('q')) { $('q').value = ''; render(); }
 });
 
@@ -338,7 +338,7 @@ $('todoClear').onclick = async () => {
 let noteId = null; // the open note
 // A new note stays a draft (not saved, not synced) until you type in it, so clicking
 // New note and walking away doesn't leave an empty "Untitled" behind.
-const isEmptyNote = n => !n.title.trim() && !(n.body || '').trim();
+const isEmptyNote = n => !(n.title || '').trim() && !(n.body || '').trim();
 function dropDraft(keepId) {
   if (!draft || draft.id === keepId) return;
   data.notes = data.notes.filter(n => n.id !== draft.id);
@@ -347,6 +347,7 @@ function dropDraft(keepId) {
 let noteTimer;
 const when = iso => {
   const d = new Date(iso);
+  if (isNaN(d)) return ''; // synced note without a date
   return d.toDateString() === new Date().toDateString()
     ? d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
     : d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
@@ -383,7 +384,7 @@ function renderNotes() {
     data.notes = data.notes.filter(n => !junk.includes(n));
     chrome.storage.local.set({ notes: data.notes.filter(n => n.id !== draft?.id) });
   }
-  const notes = [...data.notes].sort((a, b) => b.updated.localeCompare(a.updated)); // last edited on top
+  const notes = [...data.notes].sort((a, b) => String(b.updated || '').localeCompare(String(a.updated || ''))); // last edited on top
   if (!notes.some(n => n.id === noteId)) noteId = notes[0]?.id ?? null;
   $('notesSub').textContent = plural(notes.length, 'note');
   $('notesEmpty').hidden = !!notes.length;
@@ -391,7 +392,7 @@ function renderNotes() {
   $('noteList').replaceChildren(...notes.map(n => {
     const b = el('button', { className: `note-item${n.id === noteId ? ' active' : ''}` });
     b.append(
-      el('strong', { textContent: n.title.trim() || 'Untitled' }),
+      el('strong', { textContent: (n.title || '').trim() || 'Untitled' }),
       el('span', { textContent: (n.body || '').trim().slice(0, 90) || 'No text' }),
       el('small', { textContent: when(n.updated) })
     );
@@ -404,7 +405,7 @@ function renderNotes() {
   const ed = $('noteEditor');
   if (ed.dataset.id !== n.id || !ed.contains(document.activeElement)) {
     ed.dataset.id = n.id;
-    $('noteTitle').value = n.title;
+    $('noteTitle').value = n.title || '';
     $('noteText').innerHTML = cleanHtml(n.html ?? textToHtml(n.body));
     ed.dataset.loaded = $('noteText').innerHTML; // so just opening a note doesn't count as an edit
     $('noteSaved').textContent = `Edited ${when(n.updated)}`;
@@ -419,7 +420,7 @@ function flushNote() {
   const n = data.notes.find(x => x.id === ed.dataset.id);
   if (!n) return;
   const title = $('noteTitle').value, html = $('noteText').innerHTML;
-  if (n.title === title && html === ed.dataset.loaded) return;
+  if ((n.title || '') === title && html === ed.dataset.loaded) return;
   ed.dataset.loaded = html;
   const body = $('noteText').innerText;
   if (draft?.id === n.id && !title.trim() && !body.trim()) return; // still blank: keep it a draft
@@ -521,7 +522,7 @@ $('deleteNote').onclick = async () => {
   if (!n) return;
   clearTimeout(noteTimer);
   if (n.id === draft?.id) { dropDraft(); noteId = null; return renderNotes(); } // never saved: nothing to confirm
-  if (!confirm(`Delete "${n.title.trim() || 'Untitled'}"?`)) return;
+  if (!confirm(`Delete "${(n.title || '').trim() || 'Untitled'}"?`)) return;
   const before = await chrome.storage.local.get('notes');
   await chrome.storage.local.set({ notes: data.notes.filter(x => x.id !== n.id) });
   toast('Note deleted', { label: 'Undo', run: () => { noteId = n.id; chrome.storage.local.set(before); } });

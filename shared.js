@@ -17,7 +17,7 @@ async function mergeBookmarks(data) {
   if (data?.linkgroups) data = fromBonjourr(data);
   const incoming = Array.isArray(data) ? data : data?.bookmarks || [];
   const { bookmarks = [], folders = [] } = await chrome.storage.local.get(['bookmarks', 'folders']);
-  const seen = new Set(bookmarks.map(b => `${b.folder}\n${b.url}`));
+  const seen = new Set(bookmarks.map(b => `${b.folder || 'Unsorted'}\n${b.url}`));
   let added = 0;
 
   for (const f of [...(data?.folders || []), ...incoming.map(b => b.folder || 'Unsorted')]) {
@@ -144,7 +144,12 @@ async function seedFromBundle() {
 const faviconUrl = page => chrome.runtime.getURL(`/_favicon/?pageUrl=${encodeURIComponent(page)}&size=32`);
 const bytesOf = async blob => new Uint8Array(await blob.arrayBuffer()).join();
 let globe;
-async function chromeIcon(page) {
+const iconCache = new Map(); // page -> blob URL or null; renders reuse it instead of refetching
+function chromeIcon(page) {
+  if (!iconCache.has(page)) iconCache.set(page, lookupIcon(page));
+  return iconCache.get(page);
+}
+async function lookupIcon(page) {
   try {
     globe ??= fetch(faviconUrl('https://no-icon.invalid/')).then(r => r.blob()).then(bytesOf);
     const r = await fetch(faviconUrl(page));
