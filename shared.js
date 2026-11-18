@@ -134,20 +134,6 @@ const syncFingerprint = s => JSON.stringify([
   (s.notes || []).map(n => JSON.stringify([n.id, n.title, n.html ?? n.body])).sort(),
 ]);
 
-// Merge the bundled bookmarks.json into storage. Skipped if the file hasn't changed
-// since the last import, so links you deleted don't come back.
-async function seedFromBundle() {
-  // bookmarks.json is optional (it's git-ignored, so a fresh clone has none).
-  const res = await fetch(chrome.runtime.getURL('bookmarks.json')).catch(() => null);
-  if (!res?.ok) return 0;
-  const text = await res.text();
-  const { seedText } = await chrome.storage.local.get('seedText');
-  if (text === seedText) return 0;
-  const added = await mergeBookmarks(JSON.parse(text));
-  await chrome.storage.local.set({ seedText: text });
-  return added;
-}
-
 // Chrome's favicon cache. When it has no icon for a page it returns a generic globe
 // instead of an error, so compare against that globe and treat a match as "no icon".
 const faviconUrl = page => chrome.runtime.getURL(`/_favicon/?pageUrl=${encodeURIComponent(page)}&size=32`);

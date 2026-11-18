@@ -1,9 +1,8 @@
 importScripts('shared.js');
 
-// 1) On install / reload: merge the bundled bookmarks.json into storage.
+// 1) On install / reload. (bookmarks.json in this folder is read by the restore below.)
 chrome.runtime.onInstalled.addListener(async () => {
-  await seedFromBundle().catch(e => console.error('bookmarks.json import failed', e));
-  await chrome.storage.local.remove('reopenPage'); // old flag, no longer used
+  await chrome.storage.local.remove(['reopenPage', 'seedText']); // old keys, no longer used
   ensurePage();
 });
 
@@ -65,30 +64,43 @@ chrome.storage.onChanged.addListener((changes, area) => {
   timer = setTimeout(backup, 1000);
 });
 
-// Reinstalled (the browser wiped this extension's storage): pull that backup file back in, once,
-// before the first new backup overwrites it. Works because an unpacked extension may read local
-// files ("Allow access to file URLs", on by default for unpacked extensions).
-// After it, paste the GitHub token again and sync catches up with the other browsers.
+// Installed or reinstalled (the browser wiped this extension's storage): read the backups back in,
+// once, before a new backup overwrites them. Only once per install: Chrome and Edge both write
+// these files, so reading them again later would bring back links the other browser deleted.
+//  1. bookmarks.json in this extension's folder (the backup folder you picked, or a file you put there)
+//  2. Downloads/URL Bookmarker/bookmarks.json. Reading it works because an unpacked extension may
+//     read local files ("Allow access to file URLs", on by default for unpacked extensions).
+// Both are merged: nothing is overwritten, missing items are added.
 const restoring = (async () => {
   const { restoreChecked } = await chrome.storage.local.get('restoreChecked');
   if (restoreChecked) return;
-  try {
-    const dir = await chrome.extension.isAllowedFileSchemeAccess() && await downloadsFolder();
-    const res = dir && await fetch(encodeURI(`file:///${dir.replace(/\\/g, '/')}/bookmarks.json`)).catch(() => null);
-    const data = res?.ok && JSON.parse(await res.text());
-    if (data) {
-      const added = await mergeBookmarks(data);
-      const { homeSettings = {} } = await chrome.storage.local.get('homeSettings');
+  let added = 0, token = null;
+  const sources = [
+    () => chrome.runtime.getURL('bookmarks.json'),
+    async () => {
+      const dir = await chrome.extension.isAllowedFileSchemeAccess() && await downloadsFolder();
+      return dir && encodeURI(`file:///${dir.replace(/\\/g, '/')}/bookmarks.json`);
+    },
+  ];
+  for (const where of sources) {
+    try {
+      const url = await where();
+      const res = url && await fetch(url).catch(() => null);
+      const data = res?.ok && JSON.parse(await res.text());
+      if (!data) continue;
+      added += await mergeBookmarks(data);
+      const { homeSettings = {}, syncSettings } = await chrome.storage.local.get(['homeSettings', 'syncSettings']);
       if (data.home && !homeSettings.name && !homeSettings.zones) await chrome.storage.local.set({ homeSettings: { ...homeSettings, ...data.home } });
       // The token too, so sync turns itself back on.
-      const { syncSettings } = await chrome.storage.local.get('syncSettings');
-      const token = typeof data.sync?.token === 'string' && !syncSettings?.token && data.sync.token;
-      if (token) await chrome.storage.local.set({ syncSettings: { token, gistId: data.sync.gistId }, syncDisabled: false });
-      if (added || token) await chrome.storage.local.set({ restoredNotice: { added, sync: !!token } }); // the bookmarks page shows a toast
-      if (token) queue(sync);
-    }
-  } catch (e) { console.error('Restore from backup failed', e); }
+      if (typeof data.sync?.token === 'string' && !syncSettings?.token) {
+        token = data.sync.token;
+        await chrome.storage.local.set({ syncSettings: { token, gistId: data.sync.gistId }, syncDisabled: false });
+      }
+    } catch (e) { console.error('Restore from backup failed', e); }
+  }
+  if (added || token) await chrome.storage.local.set({ restoredNotice: { added, sync: !!token } }); // the bookmarks page shows a toast
   await chrome.storage.local.set({ restoreChecked: true });
+  if (token) queue(sync);
 })();
 
 // Extensions can't ask where Downloads is, so save a tiny file next to the backup, read its

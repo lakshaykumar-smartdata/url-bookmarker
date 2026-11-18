@@ -11,9 +11,13 @@ A Chrome extension (Manifest V3) for saving pages into folders, with a bookmarks
 ## Bringing in existing bookmarks
 
 - **Import** on the bookmarks page accepts this extension's JSON export or a Bonjourr backup. It only adds what's missing (links, to-dos, notes); nothing you have is changed.
-- Every change is also backed up to `Downloads/URL Bookmarker/bookmarks.json`, with links, folders, to-dos and notes. **Export** saves the same file.
-- Reinstalled the extension? On first start it reads that backup back in by itself (links, folders, to-dos, notes, greeting name and clocks), before any new backup overwrites it. The GitHub token is in that backup too, so sync turns itself back on (Export leaves the token out; turning sync off removes it from the backup). Anyone who can open your Downloads folder can read the token, so give it only the `gist` permission. This needs "Allow access to file URLs", which is on by default for an unpacked extension.
-- Or put a `bookmarks.json` (same format as **Export**) in this folder and reload the extension. It's merged in once and is git-ignored, so personal links stay out of the repo.
+- **Backups.** Every change is saved as `bookmarks.json` (links, folders, to-dos, notes, greeting name, clocks and the GitHub token) in two places:
+  - **This extension's folder**, once you pick it: **Sync → Backup folder → Choose folder**, then select `bookmark-extension`. Browsers only let an extension write outside Downloads to a folder you picked, and they may ask again after a restart. The page then shows "Backup to the extension folder is paused"; click **Allow**. The file is git-ignored.
+  - **Downloads/URL Bookmarker/**, always, as a fallback.
+  **Export** saves the same data without the token, because that's the file you might share.
+- **Reinstalled?** On first start the extension reads both backups back in by itself, before any new backup overwrites them. Nothing is replaced; missing items are added. The token comes back too, so sync turns itself on again. After a reinstall, pick the backup folder once more. Reading Downloads needs "Allow access to file URLs", which is on by default for an unpacked extension.
+- The backups are read only on a fresh install, never later. Chrome and Edge both write them, so reading them again would bring back links the other browser deleted.
+- Anyone who can open these folders can read the token, so give it only the `gist` permission. Turning sync off removes the token from the backups.
 
 ## Sync between browsers
 

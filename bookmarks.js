@@ -257,7 +257,77 @@ $('file').onchange = async () => {
   $('file').value = '';
 };
 
-seedFromBundle().finally(load); // also here, in case the background import didn't run
+load();
+
+// ---------- Backup into the extension's own folder ----------
+// Browsers only let an extension save into Downloads by itself. Writing anywhere else needs a folder
+// you pick once; the handle is kept in IndexedDB. The file is bookmarks.json (git-ignored), which a
+// reinstall reads back in (background.js). The Downloads backup keeps running as a fallback.
+const idb = (mode, fn) => new Promise((resolve, reject) => {
+  const open = indexedDB.open('backup', 1);
+  open.onupgradeneeded = () => open.result.createObjectStore('kv');
+  open.onerror = () => reject(open.error);
+  open.onsuccess = () => {
+    const tx = open.result.transaction('kv', mode), req = fn(tx.objectStore('kv'));
+    tx.oncomplete = () => resolve(req.result);
+    tx.onerror = () => reject(tx.error);
+  };
+});
+const folderState = { dir: null, at: null, error: '' };
+async function showFolder() {
+  const { dir, at, error } = folderState;
+  const allowed = dir && await dir.queryPermission({ mode: 'readwrite' }) === 'granted';
+  $('folderState').textContent = !dir ? 'Not set. Pick the extension folder (bookmark-extension) to keep a backup there too.'
+    : error ? `${dir.name}: ${error}`
+    : !allowed ? `${dir.name}: paused until you allow the browser to save there.`
+    : `Saving to ${dir.name}\\bookmarks.json${at ? `, last at ${new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}.`;
+  $('folderBtn').textContent = dir && !allowed ? 'Allow' : dir ? 'Change folder' : 'Choose folder';
+  return allowed;
+}
+async function writeFolderBackup() {
+  try {
+    if (!(await showFolder())) return;
+    const file = await (await folderState.dir.getFileHandle('bookmarks.json', { create: true })).createWritable();
+    await file.write(await backupJson(true));
+    await file.close();
+    Object.assign(folderState, { at: Date.now(), error: '' });
+  } catch (e) {
+    folderState.error = `couldn't save (${e.message})`;
+  }
+  showFolder();
+}
+let folderTimer;
+chrome.storage.onChanged.addListener((c, area) => {
+  if (area !== 'local' || !['bookmarks', 'folders', 'todos', 'notes', 'homeSettings', 'syncSettings'].some(k => c[k])) return;
+  clearTimeout(folderTimer);
+  folderTimer = setTimeout(writeFolderBackup, 1500);
+});
+$('folderBtn').onclick = async () => {
+  try {
+    const { dir } = folderState;
+    if (dir && await dir.queryPermission({ mode: 'readwrite' }) !== 'granted') {
+      await dir.requestPermission({ mode: 'readwrite' });
+      return writeFolderBackup();
+    }
+    const pick = await showDirectoryPicker({ id: 'url-bookmarker-backup', mode: 'readwrite' });
+    // Catch picking the wrong folder: the extension folder has this extension's manifest.json.
+    const name = await pick.getFileHandle('manifest.json').then(h => h.getFile()).then(f => f.text()).then(t => JSON.parse(t).name).catch(() => null);
+    if (name !== chrome.runtime.getManifest().name
+      && !confirm(`"${pick.name}" isn't the extension folder, so a reinstall won't find the backup there. Use it anyway?`)) return;
+    await idb('readwrite', s => s.put(pick, 'dir'));
+    Object.assign(folderState, { dir: pick, error: '' });
+    writeFolderBackup();
+  } catch (e) {
+    if (e.name !== 'AbortError') toast(`Couldn't use that folder: ${e.message}`);
+  }
+};
+// On load: save once (changes may have come in while this page was closed). If the browser
+// wants your OK again (it can after a restart), say so once instead of failing silently.
+idb('readonly', s => s.get('dir')).then(async dir => {
+  folderState.dir = dir || null;
+  if (await showFolder()) return writeFolderBackup();
+  if (dir) toast('Backup to the extension folder is paused.', { label: 'Allow', run: () => $('folderBtn').click() });
+}).catch(console.error);
 
 // After a reinstall the background pulls the Downloads backup back in (see background.js).
 const restoredToast = r => {

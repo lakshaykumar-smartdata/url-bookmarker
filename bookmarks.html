@@ -406,6 +406,8 @@
       padding: 8px 10px 8px 20px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted);
     }
     .empty .btn { margin: 14px auto 0; }
+    .backup-folder { display: grid; gap: 6px; justify-items: start; margin-top: 4px; padding-top: 12px; border-top: 1px solid rgb(127 127 127 / 25%); }
+    .backup-folder .hint { margin: 0; overflow-wrap: anywhere; }
     .sync-panel { position: fixed; top: 70px; right: 20px; bottom: auto; z-index: 30; width: 320px; }
     .home-settings .hint { margin: 0; font-size: 12px; color: var(--muted); }
     .home-settings .link { color: var(--accent); text-decoration: none; }
@@ -508,6 +510,11 @@
     <div class="sync-buttons">
       <button class="btn small" type="button" id="syncOff">Turn off</button>
       <button class="btn small primary-btn" type="submit">Save and sync</button>
+    </div>
+    <div class="backup-folder">
+      <strong>Backup folder</strong>
+      <p class="hint" id="folderState"></p>
+      <button class="btn small" type="button" id="folderBtn">Choose folder</button>
     </div>
   </form>
 
