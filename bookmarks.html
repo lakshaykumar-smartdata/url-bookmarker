@@ -436,6 +436,34 @@
     .note-tools button:hover { background: rgb(255 255 255 / 10%); color: var(--text); }
     .note-tools button.on { background: rgb(255 255 255 / 16%); color: var(--text); }
     .note-tools .sep { width: 1px; height: 18px; margin: 0 4px; background: var(--border); }
+    /* Tabs inside a note: one page each, like OneNote. */
+    .note-tabs { display: flex; align-items: flex-end; gap: 2px; margin: 4px 14px 0; padding: 2px 2px 0; overflow: auto hidden; border-bottom: 1px solid var(--border); scrollbar-width: thin; }
+    .note-tab {
+      flex: none; display: flex; align-items: center; max-width: 220px; margin-bottom: -1px; color: var(--muted);
+      border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0;
+    }
+    .note-tab:hover { color: var(--text); background: rgb(255 255 255 / 6%); }
+    .note-tab.active { color: var(--text); border-color: var(--border); background: rgb(255 255 255 / 9%); box-shadow: inset 0 2px 0 var(--accent); }
+    .note-tab.dragging { opacity: .4; }
+    .note-tab.drop-before { box-shadow: inset 2px 0 0 var(--accent); }
+    .note-tab.drop-after { box-shadow: inset -2px 0 0 var(--accent); }
+    .tab-name {
+      min-width: 0; padding: 8px 12px; border: 0; background: none; color: inherit; font: inherit; font-size: 13px; font-weight: 550;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .note-tab:has(.tab-x) .tab-name { padding-right: 4px; }
+    .tab-x { flex: none; width: 20px; height: 20px; margin-right: 6px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 5px; background: none; color: var(--faint); opacity: 0; }
+    .note-tab:hover .tab-x, .note-tab.active .tab-x, .tab-x:focus-visible { opacity: 1; }
+    .tab-x:hover { background: rgb(255 255 255 / 12%); color: var(--text); }
+    .tab-x .i { width: 12px; height: 12px; }
+    .note-tab input {
+      width: 150px; height: 28px; margin: 3px 6px; padding: 0 8px; font: inherit; font-size: 13px; color: var(--text);
+      border: 1px solid var(--accent); border-radius: 6px; background: rgb(0 0 0 / 30%); outline: none;
+    }
+    .tab-add { flex: none; width: 30px; height: 30px; margin: 0 0 3px 4px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 7px; background: none; color: var(--muted); }
+    .tab-add:hover { background: rgb(255 255 255 / 10%); color: var(--text); }
+    .tab-add .i { width: 16px; height: 16px; }
+    .note-tools { margin-top: 10px !important; }
     .note-foot {
       display: flex; align-items: center; justify-content: space-between; gap: 8px;
       padding: 8px 10px 8px 20px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted);
@@ -653,6 +681,7 @@
           <div class="note-list" id="noteList" aria-label="Notes"></div>
           <div class="note-editor" id="noteEditor">
             <input id="noteTitle" class="note-title" placeholder="Title" aria-label="Note title" autocomplete="off" maxlength="200">
+            <div class="note-tabs" id="noteTabs" role="tablist" aria-label="Tabs in this note"></div>
             <div class="note-tools" id="noteTools" role="toolbar" aria-label="Formatting">
               <button type="button" data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button>
               <button type="button" data-cmd="italic" title="Italic (Ctrl+I)"><i>I</i></button>

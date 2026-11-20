@@ -523,12 +523,33 @@ $('todoClear').onclick = async () => {
 };
 
 // ---------- Notes (synced with the Gist like bookmarks) ----------
-// A note is {id, title, html, body, updated}. html is the formatted text; body is the same as plain
-// text for the list preview. Notes from before formatting have only body.
+// A note is a document with tabs, like OneNote: {id, title, tabs: [{id, title, html, body}], body, updated}.
+// Each tab has its own page: html is the formatted text, body the same as plain text. The note's
+// body is all tabs' text, for the list preview. Notes from before tabs have only html/body:
+// they open as one tab, "Page 1" (id "main", the same in every browser so sync matches it up).
 let noteId = null; // the open note
+const tabsOf = n => (n.tabs?.length ? n.tabs : [{ id: 'main', title: 'Page 1', html: n.html ?? textToHtml(n.body), body: n.body || '' }]);
+// The tab each note was last on (this browser only).
+let openTabs = {};
+try { openTabs = JSON.parse(localStorage.getItem('noteTabs') || '{}'); } catch {}
+const tabIdOf = n => (tabsOf(n).some(t => t.id === openTabs[n.id]) ? openTabs[n.id] : tabsOf(n)[0].id);
+function setTab(nId, tId) {
+  openTabs[nId] = tId;
+  try { localStorage.setItem('noteTabs', JSON.stringify(openTabs)); } catch {}
+}
+// Change a note (fn gets it with its tabs) and save it.
+function commitNote(id, fn) {
+  data.notes = data.notes.map(x => {
+    if (x.id !== id) return x;
+    const { html, ...n } = fn({ ...x, tabs: tabsOf(x) });
+    return { ...n, body: n.tabs.map(t => (t.body || '').trim()).filter(Boolean).join('\n'), updated: new Date().toISOString() };
+  });
+  if (draft?.id === id) draft = null;
+  chrome.storage.local.set({ notes: data.notes.filter(x => x.id !== draft?.id) });
+}
 // A new note stays a draft (not saved, not synced) until you type in it, so clicking
 // New note and walking away doesn't leave an empty "Untitled" behind.
-const isEmptyNote = n => !(n.title || '').trim() && !(n.body || '').trim();
+const isEmptyNote = n => !(n.title || '').trim() && !(n.body || '').trim() && tabsOf(n).length < 2;
 function dropDraft(keepId) {
   if (!draft || draft.id === keepId) return;
   data.notes = data.notes.filter(n => n.id !== draft.id);
@@ -581,9 +602,10 @@ function renderNotes() {
   $('notesBody').hidden = !notes.length;
   $('noteList').replaceChildren(...notes.map(n => {
     const b = el('button', { className: `note-item${n.id === noteId ? ' active' : ''}` });
+    const tabs = tabsOf(n).length;
     b.append(
       el('strong', { textContent: (n.title || '').trim() || 'Untitled' }),
-      el('span', { textContent: (n.body || '').trim().slice(0, 90) || 'No text' }),
+      el('span', { textContent: (tabs > 1 ? `${tabs} tabs · ` : '') + ((n.body || '').trim().slice(0, 90) || 'No text') }),
       el('small', { textContent: when(n.updated) })
     );
     b.onclick = () => { flushNote(); dropDraft(n.id); noteId = n.id; renderNotes(); };
@@ -591,33 +613,143 @@ function renderNotes() {
   }));
   const n = notes.find(x => x.id === noteId);
   if (!n) return;
-  // Don't overwrite what you're typing: only refill for another note, or when the editor isn't focused.
+  const tabId = tabIdOf(n), tab = tabsOf(n).find(t => t.id === tabId);
+  renderTabs(n, tabId);
+  // Don't overwrite what you're typing: only refill for another note or tab, or when the editor isn't focused.
   const ed = $('noteEditor');
-  if (ed.dataset.id !== n.id || !ed.contains(document.activeElement)) {
+  const typing = ed.contains(document.activeElement) && !$('noteTabs').contains(document.activeElement);
+  if (ed.dataset.id !== n.id || ed.dataset.tab !== tabId || !typing) {
     ed.dataset.id = n.id;
-    $('noteTitle').value = n.title || '';
-    $('noteText').innerHTML = cleanHtml(n.html ?? textToHtml(n.body));
+    ed.dataset.tab = tabId;
+    if (document.activeElement !== $('noteTitle')) $('noteTitle').value = n.title || '';
+    $('noteText').innerHTML = cleanHtml(tab.html ?? textToHtml(tab.body));
     ed.dataset.loaded = $('noteText').innerHTML; // so just opening a note doesn't count as an edit
+    ed.dataset.title = n.title || '';
     $('noteSaved').textContent = `Edited ${when(n.updated)}`;
     updateTools();
   }
 }
 
-// Saves 0.6 s after you stop typing, and when you leave the note.
+// ---------- Tabs ----------
+function renderTabs(n, tabId) {
+  const strip = $('noteTabs');
+  if (strip.querySelector('input')) return; // renaming a tab: leave it alone
+  const tabs = tabsOf(n);
+  const items = tabs.map(t => {
+    const item = el('div', { className: `note-tab${t.id === tabId ? ' active' : ''}` });
+    const name = el('button', { type: 'button', className: 'tab-name', textContent: (t.title || '').trim() || 'Untitled', title: 'Double-click to rename, drag to move' });
+    name.setAttribute('role', 'tab');
+    name.setAttribute('aria-selected', String(t.id === tabId));
+    name.onclick = () => openTab(n.id, t.id);
+    name.ondblclick = () => renameTab(item, n.id, t);
+    name.onkeydown = e => { if (e.key === 'F2') renameTab(item, n.id, t); };
+    item.append(name);
+    if (tabs.length > 1) {
+      const x = el('button', { type: 'button', className: 'tab-x', title: 'Delete tab' });
+      x.append(svgIcon('x'));
+      x.onclick = () => deleteTab(n.id, t.id);
+      item.append(x);
+    }
+    // Drag a tab to move it.
+    item.draggable = true;
+    item.ondragstart = e => { e.dataTransfer.setData('text/x-tab', t.id); e.dataTransfer.effectAllowed = 'move'; item.classList.add('dragging'); };
+    item.ondragend = () => { item.classList.remove('dragging'); clearTabDrop(); };
+    item.ondragover = e => {
+      if (!e.dataTransfer.types.includes('text/x-tab')) return;
+      e.preventDefault();
+      const r = item.getBoundingClientRect();
+      clearTabDrop();
+      item.classList.add(e.clientX > r.left + r.width / 2 ? 'drop-after' : 'drop-before');
+    };
+    item.ondragleave = () => item.classList.remove('drop-before', 'drop-after');
+    item.ondrop = e => {
+      e.preventDefault();
+      const from = e.dataTransfer.getData('text/x-tab'), after = item.classList.contains('drop-after');
+      clearTabDrop();
+      if (!from || from === t.id) return;
+      flushNote();
+      commitNote(n.id, d => {
+        const moving = d.tabs.find(x => x.id === from), rest = d.tabs.filter(x => x.id !== from);
+        rest.splice(rest.findIndex(x => x.id === t.id) + (after ? 1 : 0), 0, moving);
+        return { ...d, tabs: rest };
+      });
+      renderNotes();
+    };
+    return item;
+  });
+  const add = el('button', { type: 'button', className: 'tab-add', title: 'New tab' });
+  add.append(svgIcon('plus'));
+  add.onclick = () => addTab(n.id);
+  strip.replaceChildren(...items, add);
+  strip.querySelector('.note-tab.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+const clearTabDrop = () => document.querySelectorAll('.note-tab.drop-before, .note-tab.drop-after')
+  .forEach(x => x.classList.remove('drop-before', 'drop-after'));
+
+function openTab(nId, tId) {
+  flushNote();
+  setTab(nId, tId);
+  renderNotes();
+}
+function addTab(nId) {
+  flushNote();
+  const id = crypto.randomUUID();
+  commitNote(nId, n => ({ ...n, tabs: [...n.tabs, { id, title: `Page ${n.tabs.length + 1}`, html: '', body: '' }] }));
+  setTab(nId, id);
+  renderNotes();
+  const item = [...$('noteTabs').querySelectorAll('.note-tab')].at(-1);
+  renameTab(item, nId, tabsOf(data.notes.find(x => x.id === nId)).at(-1)); // name it straight away
+}
+function renameTab(item, nId, t) {
+  const name = item.querySelector('.tab-name');
+  const input = el('input', { value: t.title || '', maxLength: 60, placeholder: 'Tab name' });
+  input.setAttribute('aria-label', 'Tab name');
+  name.replaceWith(input);
+  item.draggable = false;
+  input.focus();
+  input.select();
+  let done = false;
+  const finish = save => {
+    if (done) return;
+    done = true;
+    input.replaceWith(name); // first, so the redraw below isn't skipped
+    const title = input.value.trim();
+    if (save && title && title !== t.title) commitNote(nId, n => ({ ...n, tabs: n.tabs.map(x => (x.id === t.id ? { ...x, title } : x)) }));
+    renderNotes();
+  };
+  input.onkeydown = e => {
+    if (e.key === 'Enter') { finish(true); $('noteText').focus(); }
+    if (e.key === 'Escape') finish(false);
+  };
+  input.onblur = () => finish(true);
+}
+async function deleteTab(nId, tId) {
+  flushNote();
+  const n = data.notes.find(x => x.id === nId), tabs = tabsOf(n), t = tabs.find(x => x.id === tId);
+  if (tabs.length < 2) return;
+  if ((t.body || '').trim() && !confirm(`Delete the tab "${(t.title || '').trim() || 'Untitled'}" and its text?`)) return;
+  const before = structuredClone(await chrome.storage.local.get('notes'));
+  const i = tabs.indexOf(t);
+  if (tabIdOf(n) === tId) setTab(nId, (tabs[i + 1] || tabs[i - 1]).id);
+  commitNote(nId, d => ({ ...d, tabs: d.tabs.filter(x => x.id !== tId) }));
+  renderNotes();
+  toast('Tab deleted', { label: 'Undo', run: () => { setTab(nId, tId); chrome.storage.local.set(before); } });
+}
+
+// Saves 0.6 s after you stop typing, and when you leave the note or tab.
 function flushNote() {
   clearTimeout(noteTimer);
   const ed = $('noteEditor');
   const n = data.notes.find(x => x.id === ed.dataset.id);
   if (!n) return;
   const title = $('noteTitle').value, html = $('noteText').innerHTML;
-  if ((n.title || '') === title && html === ed.dataset.loaded) return;
+  if (ed.dataset.title === title && html === ed.dataset.loaded) return;
   ed.dataset.loaded = html;
-  const body = $('noteText').innerText;
+  ed.dataset.title = title;
+  const body = $('noteText').innerText, tabId = ed.dataset.tab;
   if (draft?.id === n.id && !title.trim() && !body.trim()) return; // still blank: keep it a draft
-  data.notes = data.notes.map(x => (x.id === n.id ? { ...x, title, html, body, updated: new Date().toISOString() } : x));
-  if (draft?.id === n.id) draft = null;
+  commitNote(n.id, d => ({ ...d, title, tabs: d.tabs.map(t => (t.id === tabId ? { ...t, html, body } : t)) }));
   $('noteSaved').textContent = 'Saved';
-  chrome.storage.local.set({ notes: data.notes.filter(x => x.id !== draft?.id) });
 }
 function onNoteInput() {
   const t = $('noteText');
@@ -627,7 +759,7 @@ function onNoteInput() {
   noteTimer = setTimeout(flushNote, 600);
 }
 $('noteTitle').oninput = $('noteText').oninput = onNoteInput;
-$('noteEditor').addEventListener('focusout', flushNote);
+$('noteEditor').addEventListener('focusout', e => !$('noteTabs').contains(e.target) && flushNote());
 $('noteTitle').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); $('noteText').focus(); } };
 window.addEventListener('beforeunload', flushNote);
 
@@ -697,7 +829,7 @@ $('noteTools').addEventListener('click', e => {
 const newNote = () => {
   flushNote();
   if (!draft) {
-    draft = { id: crypto.randomUUID(), title: '', html: '', body: '', updated: new Date().toISOString() };
+    draft = { id: crypto.randomUUID(), title: '', tabs: [{ id: crypto.randomUUID(), title: 'Page 1', html: '', body: '' }], body: '', updated: new Date().toISOString() };
     data.notes = [draft, ...data.notes];
   }
   noteId = draft.id;
@@ -712,7 +844,8 @@ $('deleteNote').onclick = async () => {
   if (!n) return;
   clearTimeout(noteTimer);
   if (n.id === draft?.id) { dropDraft(); noteId = null; return renderNotes(); } // never saved: nothing to confirm
-  if (!confirm(`Delete "${(n.title || '').trim() || 'Untitled'}"?`)) return;
+  const tabs = tabsOf(n).length;
+  if (!confirm(`Delete "${(n.title || '').trim() || 'Untitled'}"${tabs > 1 ? ` and all ${tabs} tabs` : ''}?`)) return;
   const before = await chrome.storage.local.get('notes');
   await chrome.storage.local.set({ notes: data.notes.filter(x => x.id !== n.id) });
   toast('Note deleted', { label: 'Undo', run: () => { noteId = n.id; chrome.storage.local.set(before); } });

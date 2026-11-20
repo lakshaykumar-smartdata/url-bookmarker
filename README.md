@@ -10,6 +10,7 @@ A Chrome extension (Manifest V3) for saving pages into folders, with a bookmarks
 
 ## Bringing in existing bookmarks
 
+- **Notes with tabs.** Each note is a document with its own tabs, like OneNote: **+** adds a tab, double-click (or F2) renames it, drag to reorder, × deletes it (with Undo). Each note reopens on the tab you were last on. Older notes open as one tab, "Page 1".
 - **Edit titles.** Hover a link and click the pencil to rename it (Enter or click away saves, Esc cancels). In the popup, edit the title box (with the pencil) before saving; on a page you already saved, changing it and clicking **Update title** renames the saved link. Renames sync to your other browsers.
 - **Frequently used.** Home shows the 8 links you open most from the bookmarks page (click, Ctrl+click or middle click), as shortcut tiles under Google search. Hover a tile and click × to drop it from the row. Counts stay in this browser; they aren't synced or backed up.
 - **Chrome bookmarks.** The sidebar lists your browser's own bookmark folders under *Chrome bookmarks*, below your folders. They're read-only here and update live; edit them in Chrome's bookmark manager.

@@ -131,7 +131,7 @@ function mergeSync(a, b) {
 const syncFingerprint = s => JSON.stringify([
   s.name || '', s.zones ?? null, s.bookmarks.map(bKey).sort(), s.folders, s.stamps, // folder order matters, it's shown in the sidebar
   (s.todos || []).map(t => JSON.stringify([t.id, t.text, t.done])).sort(),
-  (s.notes || []).map(n => JSON.stringify([n.id, n.title, n.html ?? n.body])).sort(),
+  (s.notes || []).map(n => JSON.stringify([n.id, n.title, n.tabs ?? n.html ?? n.body])).sort(),
 ]);
 
 // Chrome's favicon cache. When it has no icon for a page it returns a generic globe
