@@ -73,11 +73,13 @@ fetch(chrome.runtime.getURL('manifest.json')).then(r => r.json()).then(async m =
 if (location.hash === '#pinned') chrome.tabs.getCurrent(t => t && !t.pinned && chrome.tabs.update(t.id, { pinned: true }));
 
 let data = { bookmarks: [], folders: [], todos: [], notes: [] };
+let uses = {}; // url -> { n: times opened, last: when }, for "Frequently used" on Home
 let draft = null; // unsaved new note, see Notes below
 let selected = HOME; // the page always opens on Home
 
 async function load() {
-  const { bookmarks = [], folders = [], todos = [], notes = [] } = await chrome.storage.local.get(['bookmarks', 'folders', 'todos', 'notes']);
+  const { bookmarks = [], folders = [], todos = [], notes = [], linkUses = {} } = await chrome.storage.local.get(['bookmarks', 'folders', 'todos', 'notes', 'linkUses']);
+  uses = linkUses;
   data = { bookmarks, folders: [...new Set([...folders, ...bookmarks.map(folderOf)])], todos,
     notes: draft && !notes.some(n => n.id === draft.id) ? [draft, ...notes] : notes };
   if (![ALL, HOME, TODO, NOTES].includes(selected) && !selected.startsWith(CB) && !data.folders.includes(selected)) selected = ALL;
@@ -105,7 +107,7 @@ function row(b, i, showFolder) {
 
   const info = el('div', { className: 'info' });
   info.append(
-    el('a', { href: /^\s*(javascript|data|vbscript):/i.test(b.url) ? '#' : b.url, target: '_blank', rel: 'noopener', title: b.url, textContent: b.title || b.url }),
+    trackOpens(el('a', { href: safeHref(b.url), target: '_blank', rel: 'noopener', title: b.url, textContent: b.title || b.url }), b.url),
     el('div', { className: 'meta', textContent: host(b.url) })
   );
 
@@ -143,6 +145,59 @@ function row(b, i, showFolder) {
   return li;
 }
 
+// ---------- Frequently used (Home) ----------
+const safeHref = url => /^\s*(javascript|data|vbscript):/i.test(url) ? '#' : url;
+
+// Count a link each time it's opened from this page: click, Ctrl+click or middle click.
+function trackOpens(a, url) {
+  const count = () => {
+    const u = uses[url];
+    uses = { ...uses, [url]: { n: (u?.n || 0) + 1, last: Date.now() } };
+    chrome.storage.local.set({ linkUses: uses });
+  };
+  a.addEventListener('click', count);
+  a.addEventListener('auxclick', e => e.button === 1 && count());
+  return a;
+}
+
+// The 8 most-opened links that are still saved (here or in Chrome's bookmarks).
+function topLinks() {
+  const known = new Map();
+  for (const f of chromeFolders) for (const b of f.links) known.set(b.url, b);
+  for (const b of data.bookmarks) known.set(b.url, b); // your own titles win
+  return Object.entries(uses).filter(([url]) => known.has(url))
+    .sort(([, a], [, b]) => b.n - a.n || b.last - a.last).slice(0, 8).map(([url]) => known.get(url));
+}
+
+function renderFrequent() {
+  const top = topLinks();
+  $('frequent').hidden = !top.length;
+  $('frequentList').replaceChildren(...top.map(b => {
+    const name = b.title || host(b.url);
+    const icon = el('span', { className: 'fq-icon' });
+    icon.append(siteIcon(b.url, 'favimg', b.icon));
+    const a = trackOpens(el('a', { href: safeHref(b.url), target: '_blank', rel: 'noopener', title: `${name}\n${b.url}` }), b.url);
+    a.append(icon, el('span', { className: 'fq-name', textContent: name }));
+    const x = el('button', { className: 'fq-x', type: 'button', title: 'Remove from Frequently used' });
+    x.append(svgIcon('x'));
+    x.onclick = () => {
+      const before = uses;
+      uses = { ...uses };
+      delete uses[b.url];
+      chrome.storage.local.set({ linkUses: uses });
+      toast(`Removed “${name}” from Frequently used`, { label: 'Undo', run: () => chrome.storage.local.set({ linkUses: before }) });
+    };
+    const tile = el('div', { className: 'fq' });
+    tile.append(a, x);
+    return tile;
+  }));
+}
+chrome.storage.onChanged.addListener(c => {
+  if (!c.linkUses) return;
+  uses = c.linkUses.newValue || {};
+  if (!$('home').hidden) renderFrequent();
+});
+
 function render() {
   const { bookmarks, folders } = data;
   const q = $('q').value.trim().toLowerCase();
@@ -172,7 +227,7 @@ function render() {
   const notesMode = !q && selected === NOTES;
   if (!notesMode) dropDraft();
   $('notes').hidden = !notesMode;
-  if (homeMode) return;
+  if (homeMode) return renderFrequent();
   if (todoMode) { $('wrap').hidden = true; return renderTodos(); }
   if (notesMode) { $('wrap').hidden = true; return renderNotes(); }
 

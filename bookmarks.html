@@ -249,7 +249,7 @@
     .glass-btn[aria-pressed="true"] { background: rgb(255 255 255 / 22%); border-color: rgb(255 255 255 / 40%); }
     body.photo #toast { background: rgb(30 34 44 / 95%); border: 1px solid rgb(255 255 255 / 10%); }
     .home-content {
-      position: relative; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      position: relative; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: safe center; overflow-y: auto;
       padding: 24px 24px 72px; text-align: center; text-shadow: 0 1px 12px rgb(0 0 0 / 35%);
     }
     .greet { font-size: 18px; font-weight: 500; opacity: .9; }
@@ -272,6 +272,23 @@
       background: #fff; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M18 6 6 18M6 6l12 12'/%3E%3C/svg%3E") center / contain no-repeat;
     }
     .web-search input::-webkit-search-cancel-button:hover { opacity: 1; }
+    /* Frequently used: shortcut tiles for the links you open most. */
+    .frequent { width: min(840px, 100%); margin-top: 26px; text-shadow: none; }
+    .fq-label { margin-bottom: 10px; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; opacity: .8; text-shadow: 0 1px 8px rgb(0 0 0 / 45%); }
+    .fq-list { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+    .fq { position: relative; width: 96px; }
+    .fq a { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px 4px 8px; border-radius: 14px; color: #fff; text-decoration: none; transition: background .15s; }
+    .fq a:hover, .fq a:focus-visible { background: rgb(255 255 255 / 14%); outline: none; }
+    .fq-icon { width: 50px; height: 50px; display: grid; place-items: center; overflow: hidden; border-radius: 15px; background: rgb(255 255 255 / 94%); box-shadow: 0 4px 14px rgb(0 0 0 / 25%); }
+    .fq-icon .favimg { width: 26px; height: 26px; }
+    .fq-icon .favimg.letter { width: 100%; height: 100%; font-size: 20px; }
+    .fq-name { max-width: 100%; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 6px rgb(0 0 0 / 60%); }
+    .fq-x {
+      position: absolute; top: 3px; right: 8px; width: 22px; height: 22px; display: grid; place-items: center; padding: 0;
+      color: #fff; border: 0; border-radius: 50%; background: rgb(20 24 32 / 65%); opacity: 0; transition: opacity .15s;
+    }
+    .fq:hover .fq-x, .fq-x:focus-visible { opacity: 1; }
+    .fq-x .i { width: 12px; height: 12px; }
     .zones { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 28px; }
     .zone {
       width: 190px; padding: 14px 16px; text-align: left; text-shadow: none;
@@ -282,6 +299,17 @@
     .abbr { font-size: 11px; font-weight: 600; letter-spacing: .04em; padding: 1px 7px; border-radius: 6px; background: rgb(255 255 255 / 18%); }
     .zone-time { font-size: 30px; font-weight: 500; margin: 4px 0 2px; letter-spacing: -.01em; font-variant-numeric: tabular-nums; white-space: nowrap; }
     .zone-meta { font-size: 12px; opacity: .75; }
+    /* Short windows (a laptop screen): smaller clock and gaps, so Frequently used and the clocks both fit. */
+    @media (max-height: 780px) {
+      .home-content { padding-top: 12px; }
+      .big-time { font-size: clamp(56px, 12vh, 132px); margin: 2px 0 4px; }
+      .web-search { margin-top: 16px; }
+      .web-search input { height: 44px; }
+      .frequent, .zones { margin-top: 16px; }
+      .fq a { padding: 6px 4px; gap: 6px; }
+      .zone { padding: 10px 14px; }
+      .zone-time { font-size: 24px; }
+    }
     .home-bar {
       position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: space-between;
       gap: 12px; padding: 14px 18px;
@@ -472,6 +500,7 @@
     <symbol id="i-olist" viewBox="0 0 24 24"><path d="M10 6h11M10 12h11M10 18h11M4 4h1v5M4 9h2M6 19H4c0-1.2 2-2 2-3.2 0-.6-.5-.8-1-.8s-1 .3-1 .8"/></symbol>
     <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
     <symbol id="i-clear" viewBox="0 0 24 24"><path d="M4 7V4h16v3M9 20h6M12 4v16"/><path d="m3 3 18 18"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
     <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></symbol>
     <symbol id="i-sync" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></symbol>
     <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z"/></symbol>
@@ -531,6 +560,10 @@
             <svg class="i"><use href="#i-search"/></svg>
             <input name="q" type="search" autocomplete="off" placeholder="Search Google" aria-label="Search Google" required>
           </form>
+          <div class="frequent" id="frequent" hidden>
+            <div class="fq-label">Frequently used</div>
+            <div class="fq-list" id="frequentList"></div>
+          </div>
           <div class="zones" id="zones"></div>
         </div>
         <div class="home-bar">
