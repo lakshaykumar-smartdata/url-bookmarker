@@ -1,6 +1,7 @@
 const $ = id => document.getElementById(id);
 let tab;
 let savedIn = []; // folders that already hold this page
+let saved = []; // those saved copies
 
 // Same page even if the URL differs by a trailing slash or #fragment.
 const sameUrl = (a, b) => {
@@ -10,11 +11,15 @@ const sameUrl = (a, b) => {
 const listFolders = names => names.length <= 2 ? names.join(' and ') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
 
 const target = () => $('newFolder').value.trim() || $('folder').value;
+const newTitle = () => $('title').value.trim();
+// The saved copy in the chosen folder, if its title differs from what's typed: saving renames it.
+const renaming = () => saved.find(b => (b.folder || 'Unsorted') === target() && newTitle() && b.title !== newTitle());
 const updateLabel = () => {
-  const exists = savedIn.includes(target());
+  const exists = savedIn.includes(target()) && !renaming();
   $('save').classList.toggle('exists', exists);
-  $('save').querySelector('use').setAttribute('href', exists ? '#i-check' : '#i-bookmark');
-  $('saveLabel').textContent = exists ? `Already in ${target()}` : target() ? `Save to ${target()}` : 'Save bookmark';
+  $('save').querySelector('use').setAttribute('href', exists ? '#i-check' : renaming() ? '#i-pencil' : '#i-bookmark');
+  $('saveLabel').textContent = exists ? `Already in ${target()}` : renaming() ? `Update title in ${target()}`
+    : target() ? `Save to ${target()}` : 'Save bookmark';
 };
 
 (async () => {
@@ -24,12 +29,13 @@ const updateLabel = () => {
   // Older than a minute: the popup didn't open back then, so save the current tab instead.
   [tab] = Date.now() - (pendingSave?.at ?? 0) < 60000 ? [pendingSave] : await chrome.tabs.query({ active: true, currentWindow: true });
   const { folders = [], bookmarks = [] } = await chrome.storage.local.get(['folders', 'bookmarks']);
-  savedIn = tab?.url ? [...new Set(bookmarks.filter(b => sameUrl(b.url, tab.url)).map(b => b.folder || 'Unsorted'))] : [];
+  saved = tab?.url ? bookmarks.filter(b => sameUrl(b.url, tab.url)) : [];
+  savedIn = [...new Set(saved.map(b => b.folder || 'Unsorted'))];
   if (savedIn.length) {
     $('alreadyText').textContent = `Already saved in ${listFolders(savedIn)}`;
     $('already').hidden = false;
   }
-  $('title').value = tab?.title || '';
+  $('title').value = saved.find(b => folders.includes(b.folder || 'Unsorted'))?.title || saved[0]?.title || tab?.title || '';
   $('title').placeholder = 'Untitled page';
   let shown = tab?.url || 'No URL on this tab';
   try { const u = new URL(tab.url); shown = u.hostname.replace(/^www\./, '') + u.pathname.replace(/\/$/, ''); } catch {}
@@ -47,7 +53,7 @@ const updateLabel = () => {
   updateLabel();
 })();
 
-$('folder').onchange = $('newFolder').oninput = () => { $('status').textContent = ''; updateLabel(); };
+$('folder').onchange = $('newFolder').oninput = $('title').oninput = () => { $('status').textContent = ''; updateLabel(); };
 
 $('form').onsubmit = async e => {
   e.preventDefault();
@@ -56,18 +62,25 @@ $('form').onsubmit = async e => {
   if (!folder) return ($('status').textContent = 'Type a folder name first.');
 
   const { bookmarks = [], folders = [] } = await chrome.storage.local.get(['bookmarks', 'folders']);
-  if (bookmarks.some(b => sameUrl(b.url, tab.url) && (b.folder || 'Unsorted') === folder)) {
-    return ($('status').textContent = `Already saved in ${folder}. Pick another folder to save a copy.`);
+  const existing = bookmarks.find(b => sameUrl(b.url, tab.url) && (b.folder || 'Unsorted') === folder);
+  if (existing && newTitle() && existing.title !== newTitle()) {
+    existing.title = newTitle(); // rename; sync carries it over
+    await chrome.storage.local.set({ bookmarks });
+    return done(`Title updated in ${folder}`);
   }
+  if (existing) return ($('status').textContent = `Already saved in ${folder}. Pick another folder to save a copy.`);
   if (!folders.includes(folder)) folders.push(folder);
-  bookmarks.unshift({ url: tab.url, title: $('title').value.trim() || tab.title, folder, icon: tab.favIconUrl, savedAt: new Date().toISOString() });
+  bookmarks.unshift({ url: tab.url, title: newTitle() || tab.title, folder, icon: tab.favIconUrl, savedAt: new Date().toISOString() });
   await chrome.storage.local.set({ bookmarks, folders, lastFolder: folder });
-
+  done(`Saved to ${folder}`);
+};
+function done(text) {
+  $('save').classList.remove('exists');
   $('save').classList.add('saved');
   $('save').querySelector('use').setAttribute('href', '#i-check');
-  $('saveLabel').textContent = `Saved to ${folder}`;
+  $('saveLabel').textContent = text;
   setTimeout(() => window.close(), 900);
-};
+}
 
 // Bring the pinned bookmarks tab into this window and switch to it (no second copy).
 $('open').onclick = async () => {

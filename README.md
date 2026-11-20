@@ -10,7 +10,7 @@ A Chrome extension (Manifest V3) for saving pages into folders, with a bookmarks
 
 ## Bringing in existing bookmarks
 
-- **Edit titles.** Hover a link and click the pencil to rename it (Enter or click away saves, Esc cancels). In the popup, click the title to change it before saving. Renames sync to your other browsers.
+- **Edit titles.** Hover a link and click the pencil to rename it (Enter or click away saves, Esc cancels). In the popup, edit the title box (with the pencil) before saving; on a page you already saved, changing it and clicking **Update title** renames the saved link. Renames sync to your other browsers.
 - **Frequently used.** Home shows the 8 links you open most from the bookmarks page (click, Ctrl+click or middle click), as shortcut tiles under Google search. Hover a tile and click × to drop it from the row. Counts stay in this browser; they aren't synced or backed up.
 - **Chrome bookmarks.** The sidebar lists your browser's own bookmark folders under *Chrome bookmarks*, below your folders. They're read-only here and update live; edit them in Chrome's bookmark manager.
 - **Import** on the bookmarks page accepts this extension's JSON export or a Bonjourr backup. It only adds what's missing (links, to-dos, notes); nothing you have is changed.

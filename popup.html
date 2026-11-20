@@ -26,13 +26,11 @@
     #icon { width: 20px; height: 20px; object-fit: contain; }
     #icon.letter { width: 100%; height: 100%; display: grid; place-items: center; font-size: 14px; font-weight: 700; }
     header > div:last-child { flex: 1; min-width: 0; }
-    /* Looks like plain text until you hover or click it. */
-    #title {
-      display: block; width: calc(100% + 8px); height: 26px; margin: 0 0 1px -8px; padding: 0 7px;
-      font-weight: 600; font-size: 14px; border-color: transparent; background: transparent; text-overflow: ellipsis;
-    }
-    #title:hover { border-color: var(--border); }
-    #title:focus { border-color: var(--accent); background: var(--surface); }
+    /* Editable title: a light box with a pencil, so it reads as a field. */
+    .title-box { position: relative; display: flex; align-items: center; margin-bottom: 3px; }
+    #title { height: 30px; padding: 0 28px 0 8px; font-weight: 600; font-size: 14px; border-color: var(--line); text-overflow: ellipsis; }
+    .title-box .i { position: absolute; right: 9px; width: 14px; height: 14px; color: var(--faint); pointer-events: none; }
+    .title-box:hover .i, #title:focus + .i { color: var(--accent); }
     #url { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     form { display: grid; gap: 12px; padding: 16px; }
@@ -89,6 +87,7 @@
     <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></symbol>
     <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
     <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M21.17 6.81a1 1 0 0 0-3.98-3.98L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z"/><path d="m15 5 4 4"/></symbol>
     <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
     <symbol id="i-all" viewBox="0 0 24 24"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m2 12.65 9.17 4.16a2 2 0 0 0 1.66 0L22 12.65"/><path d="m2 17.65 9.17 4.16a2 2 0 0 0 1.66 0L22 17.65"/></symbol>
     <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></symbol>
@@ -97,7 +96,10 @@
   <header>
     <div class="fav"><img id="icon" alt=""></div>
     <div>
-      <input id="title" form="form" maxlength="300" autocomplete="off" spellcheck="false" aria-label="Title" title="Click to change the title">
+      <div class="title-box">
+        <input id="title" form="form" maxlength="300" autocomplete="off" spellcheck="false" aria-label="Title" title="Change the title before saving">
+        <svg class="i"><use href="#i-pencil"/></svg>
+      </div>
       <div id="url"></div>
     </div>
   </header>
