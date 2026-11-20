@@ -636,11 +636,11 @@ function renderTabs(n, tabId) {
   const tabs = tabsOf(n);
   const items = tabs.map(t => {
     const item = el('div', { className: `note-tab${t.id === tabId ? ' active' : ''}` });
-    const name = el('button', { type: 'button', className: 'tab-name', textContent: (t.title || '').trim() || 'Untitled', title: 'Double-click to rename, drag to move' });
+    const name = el('button', { type: 'button', className: 'tab-name', textContent: (t.title || '').trim() || 'Untitled',
+      title: t.id === tabId ? 'Click to rename, drag to move' : 'Open tab (double-click to rename), drag to move' });
     name.setAttribute('role', 'tab');
     name.setAttribute('aria-selected', String(t.id === tabId));
-    name.onclick = () => openTab(n.id, t.id);
-    name.ondblclick = () => renameTab(item, n.id, t);
+    name.onclick = () => (t.id === tabId ? renameTab(item, n.id, t) : openTab(n.id, t.id));
     name.onkeydown = e => { if (e.key === 'F2') renameTab(item, n.id, t); };
     item.append(name);
     if (tabs.length > 1) {
