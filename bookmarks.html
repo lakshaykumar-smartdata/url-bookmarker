@@ -148,6 +148,12 @@
     .icon-btn:hover { background: #ececf0; color: var(--text); }
     .icon-btn.danger:hover { background: var(--danger-soft); color: var(--danger); }
     .icon-btn.done { color: #16a34a; }
+    .title-input {
+      display: block; width: 100%; height: 28px; margin: -4px 0 1px; padding: 0 8px; font: inherit; font-size: 14px; font-weight: 550;
+      color: var(--text); border: 1px solid var(--accent); border-radius: 7px; background: var(--surface); outline: none;
+      box-shadow: 0 0 0 3px var(--accent-ring);
+    }
+    li.editing .row-actions { display: none; }
 
     .empty { text-align: center; padding: 72px 20px; color: var(--muted); }
     .empty .circle {
@@ -226,6 +232,7 @@
     body.photo .chip:hover { color: #fff; }
     body.photo .icon-btn:hover { background: rgb(255 255 255 / 12%); color: #fff; }
     body.photo .icon-btn.done { color: #86efac; }
+    body.photo .title-input { color: #fff; background: rgb(0 0 0 / 35%); border-color: rgb(255 255 255 / 50%); box-shadow: none; }
     body.photo .empty .circle { background: rgb(255 255 255 / 12%); }
     body.photo .empty { text-shadow: 0 1px 8px rgb(0 0 0 / 40%); }
     body.photo .rename-input { background: rgb(16 20 28 / 70%); }

@@ -130,6 +130,9 @@ function row(b, i, showFolder) {
     copy.classList.add('done');
     setTimeout(() => { copy.replaceChildren(svgIcon('copy')); copy.classList.remove('done'); }, 1200);
   };
+  const edit = el('button', { className: 'icon-btn', title: 'Edit title' });
+  edit.append(svgIcon('pencil'));
+  edit.onclick = () => editTitle(li, b, i);
   const del = el('button', { className: 'icon-btn danger', title: 'Delete' });
   del.append(svgIcon('trash'));
   del.onclick = async () => {
@@ -140,7 +143,7 @@ function row(b, i, showFolder) {
     toast('Bookmark deleted', undo(before, selected));
   };
   actions.append(copy);
-  if (i >= 0) actions.append(del);
+  if (i >= 0) actions.append(edit, del);
   li.append(actions);
   return li;
 }
@@ -197,6 +200,34 @@ chrome.storage.onChanged.addListener(c => {
   uses = c.linkUses.newValue || {};
   if (!$('home').hidden) renderFrequent();
 });
+
+// Rename a saved link in place. Enter or clicking away saves, Esc cancels. Sync carries it over
+// (any change to a link gets a new stamp, and the newest version wins in the other browser).
+function editTitle(li, b, i) {
+  const link = li.querySelector('.info a');
+  const input = el('input', { className: 'title-input', value: b.title || '', placeholder: b.url, maxLength: 300 });
+  input.setAttribute('aria-label', 'Title');
+  li.classList.add('editing');
+  link.replaceWith(input);
+  input.focus();
+  input.select();
+  let done = false;
+  const finish = async save => {
+    if (done) return;
+    done = true;
+    const title = input.value.trim();
+    if (!save || !title || title === b.title) { li.classList.remove('editing'); return input.replaceWith(link); }
+    const before = await snapshot();
+    data.bookmarks[i] = { ...b, title };
+    await chrome.storage.local.set({ bookmarks: data.bookmarks }); // onChanged redraws
+    toast('Title saved', undo(before, selected));
+  };
+  input.onkeydown = e => {
+    if (e.key === 'Enter') finish(true);
+    if (e.key === 'Escape') finish(false);
+  };
+  input.onblur = () => finish(true);
+}
 
 function render() {
   const { bookmarks, folders } = data;

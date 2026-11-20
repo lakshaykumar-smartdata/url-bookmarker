@@ -29,7 +29,8 @@ const updateLabel = () => {
     $('alreadyText').textContent = `Already saved in ${listFolders(savedIn)}`;
     $('already').hidden = false;
   }
-  $('title').textContent = tab?.title || 'Untitled page';
+  $('title').value = tab?.title || '';
+  $('title').placeholder = 'Untitled page';
   let shown = tab?.url || 'No URL on this tab';
   try { const u = new URL(tab.url); shown = u.hostname.replace(/^www\./, '') + u.pathname.replace(/\/$/, ''); } catch {}
   $('url').textContent = shown;
@@ -59,7 +60,7 @@ $('form').onsubmit = async e => {
     return ($('status').textContent = `Already saved in ${folder}. Pick another folder to save a copy.`);
   }
   if (!folders.includes(folder)) folders.push(folder);
-  bookmarks.unshift({ url: tab.url, title: tab.title, folder, icon: tab.favIconUrl, savedAt: new Date().toISOString() });
+  bookmarks.unshift({ url: tab.url, title: $('title').value.trim() || tab.title, folder, icon: tab.favIconUrl, savedAt: new Date().toISOString() });
   await chrome.storage.local.set({ bookmarks, folders, lastFolder: folder });
 
   $('save').classList.add('saved');
