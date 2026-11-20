@@ -10,6 +10,7 @@ A Chrome extension (Manifest V3) for saving pages into folders, with a bookmarks
 
 ## Bringing in existing bookmarks
 
+- **Chrome bookmarks.** The sidebar lists your browser's own bookmark folders under *Chrome bookmarks*, below your folders. They're read-only here and update live; edit them in Chrome's bookmark manager.
 - **Import** on the bookmarks page accepts this extension's JSON export or a Bonjourr backup. It only adds what's missing (links, to-dos, notes); nothing you have is changed.
 - **Backups.** Every change is saved as `bookmarks.json` (links, folders, to-dos, notes, greeting name, clocks and the GitHub token) in two places:
   - **This extension's folder**, once you pick it: **Sync → Backup folder → Choose folder**, then select `bookmark-extension`. Browsers only let an extension write outside Downloads to a folder you picked, and they may ask again after a restart. The page then shows "Backup to the extension folder is paused"; click **Allow**. The file is git-ignored.

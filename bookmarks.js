@@ -7,6 +7,25 @@ const ALL = '\0all';
 const HOME = '\0home';
 const TODO = '\0todo';
 const NOTES = '\0notes';
+const CB = '\0cb:'; // + a Chrome bookmark folder id
+
+// The browser's own bookmarks, read-only: every folder that holds links, e.g. "Bookmarks bar / Work".
+let chromeFolders = [];
+async function loadChrome() {
+  const out = [];
+  const walk = (node, path) => {
+    const links = (node.children || []).filter(c => c.url).map(c => ({ url: c.url, title: c.title }));
+    if (links.length) out.push({ key: CB + node.id, name: node.title || 'Bookmarks', path: path.join(' / '), links });
+    for (const c of node.children || []) if (!c.url) walk(c, [...path, c.title]);
+  };
+  try { for (const root of (await chrome.bookmarks.getTree())[0].children) walk(root, [root.title]); } catch {}
+  chromeFolders = out;
+  if (selected.startsWith(CB) && !out.some(f => f.key === selected)) selected = ALL;
+  render();
+}
+const chromeFolder = key => chromeFolders.find(f => f.key === key);
+for (const ev of ['onCreated', 'onRemoved', 'onChanged', 'onMoved', 'onChildrenReordered', 'onImportEnded'])
+  chrome.bookmarks?.[ev]?.addListener(() => loadChrome());
 
 // Line icon from the <symbol> sprite in bookmarks.html.
 function svgIcon(name) {
@@ -61,7 +80,7 @@ async function load() {
   const { bookmarks = [], folders = [], todos = [], notes = [] } = await chrome.storage.local.get(['bookmarks', 'folders', 'todos', 'notes']);
   data = { bookmarks, folders: [...new Set([...folders, ...bookmarks.map(folderOf)])], todos,
     notes: draft && !notes.some(n => n.id === draft.id) ? [draft, ...notes] : notes };
-  if (![ALL, HOME, TODO, NOTES].includes(selected) && !data.folders.includes(selected)) selected = ALL;
+  if (![ALL, HOME, TODO, NOTES].includes(selected) && !selected.startsWith(CB) && !data.folders.includes(selected)) selected = ALL;
   render();
 }
 
@@ -118,7 +137,8 @@ function row(b, i, showFolder) {
     await chrome.storage.local.set({ bookmarks: data.bookmarks }); // onChanged reloads
     toast('Bookmark deleted', undo(before, selected));
   };
-  actions.append(copy, del);
+  actions.append(copy);
+  if (i >= 0) actions.append(del);
   li.append(actions);
   return li;
 }
@@ -134,7 +154,9 @@ function render() {
     navButton(NOTES, 'Notes', data.notes.length || null, 'note'),
     navButton(ALL, 'All bookmarks', bookmarks.length, 'all'),
     el('div', { className: 'label', textContent: 'Folders', title: 'Drag a folder to reorder, or Alt+Up / Alt+Down' }),
-    ...folders.map(folderButton)
+    ...folders.map(folderButton),
+    ...(chromeFolders.length ? [el('div', { className: 'label', textContent: 'Chrome bookmarks', title: 'Your browser bookmarks (read-only here)' })] : []),
+    ...chromeFolders.map(f => { const b = navButton(f.key, f.name, f.links.length, 'bookmark'); b.title = f.path; return b; })
   );
   $('nav').querySelector('.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   if (focused !== undefined) $('nav').querySelector(`[data-folder="${CSS.escape(focused)}"]`)?.focus();
@@ -161,13 +183,14 @@ function render() {
     const text = `${b.title} ${b.url} ${folderOf(b)}`.toLowerCase();
     return words.every(w => text.includes(w)); // every word, any order
   });
+  else if (selected.startsWith(CB)) rows = (chromeFolder(selected)?.links ?? []).map(b => [b, -1]);
   else if (selected !== ALL) rows = rows.filter(([b]) => folderOf(b) === selected);
   const showFolder = !!q || selected === ALL || selected === HOME;
 
-  $('title').textContent = q ? `Results for “${$('q').value.trim()}”` : selected === ALL ? 'All bookmarks' : selected;
+  $('title').textContent = q ? `Results for “${$('q').value.trim()}”` : selected === ALL ? 'All bookmarks' : chromeFolder(selected)?.path ?? selected;
   $('title').hidden = renaming;
   $('renameInput').hidden = !renaming;
-  $('folderActions').hidden = renaming || !!q || selected === ALL;
+  $('folderActions').hidden = renaming || !!q || selected === ALL || selected.startsWith(CB);
   $('sub').textContent = plural(rows.length, 'link');
 
   $('list').hidden = !rows.length;
@@ -258,6 +281,7 @@ $('file').onchange = async () => {
 };
 
 load();
+loadChrome();
 
 // ---------- Backup into the extension's own folder ----------
 // Browsers only let an extension save into Downloads by itself. Writing anywhere else needs a folder
