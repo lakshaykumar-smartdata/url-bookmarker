@@ -601,13 +601,12 @@ function renderNotes() {
   $('notesEmpty').hidden = !!notes.length;
   $('notesBody').hidden = !notes.length;
   $('noteList').replaceChildren(...notes.map(n => {
-    const b = el('button', { className: `note-item${n.id === noteId ? ' active' : ''}` });
-    const tabs = tabsOf(n).length;
-    b.append(
-      el('strong', { textContent: (n.title || '').trim() || 'Untitled' }),
-      el('span', { textContent: (tabs > 1 ? `${tabs} tabs · ` : '') + ((n.body || '').trim().slice(0, 90) || 'No text') }),
-      el('small', { textContent: when(n.updated) })
-    );
+    // Just the name (and tab count): no text preview, so what's inside stays out of sight.
+    const title = (n.title || '').trim() || 'Untitled', tabs = tabsOf(n).length;
+    const b = el('button', { className: `note-item${n.id === noteId ? ' active' : ''}`, title: `${title}
+Edited ${when(n.updated)}` });
+    b.append(svgIcon('note'), el('strong', { textContent: title }));
+    if (tabs > 1) b.append(el('span', { className: 'count', textContent: tabs, title: plural(tabs, 'tab') }));
     b.onclick = () => { flushNote(); dropDraft(n.id); noteId = n.id; renderNotes(); };
     return b;
   }));
