@@ -8,6 +8,10 @@ A Chrome extension (Manifest V3) that gives you one page for everything you keep
 
 The screenshots use made-up sample data.
 
+**Popup:** click the toolbar icon on any page, change the title if you like, pick a folder and save.
+
+<img src="screenshots/popup.png" alt="Save popup" width="340">
+
 **Home:** greeting, clock, Google search, your 8 most-used links and world clocks, over an Unsplash slideshow.
 
 ![Home](screenshots/home.png)
